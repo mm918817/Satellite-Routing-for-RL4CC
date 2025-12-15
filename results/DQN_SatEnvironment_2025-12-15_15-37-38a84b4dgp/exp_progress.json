@@ -1,0 +1,8 @@
+{
+  "experiment_start_timestamp": 1765813068.663434,
+  "last_iteration": 10,
+  "last_checkpoint_dir": "/root/ray_results/DQN_SatEnvironment_2025-12-15_15-37-38a84b4dgp/checkpoints/10",
+  "experiment_end_timestamp": 1765813086.716528,
+  "experiment_duration_s": 18.053094,
+  "avg_time_per_iter_s": 1.805309
+}

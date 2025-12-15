@@ -1,0 +1,8 @@
+{
+  "experiment_start_timestamp": 1765403235.716185,
+  "last_iteration": 10,
+  "last_checkpoint_dir": "/root/ray_results/PPO_SatEnvironment_2025-12-10_21-47-06bde1jjk7/checkpoints/10",
+  "experiment_end_timestamp": 1765403250.077204,
+  "experiment_duration_s": 14.361019,
+  "avg_time_per_iter_s": 1.436102
+}
