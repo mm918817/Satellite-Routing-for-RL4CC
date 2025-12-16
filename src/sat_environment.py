@@ -71,7 +71,11 @@ class SatEnvironment(BaseEnvironment):
 
 
     def observation(self):
-        obs = np.array([self.current_sat, self.end_id])
+        obs = np.array([self.cur_lat, self.cur_lon,
+                        self.lat1, self.lon1,
+                        self.lat2, self.lon2,
+                        self.lat3, self.lon3,
+                        self.end_lat, self.end_lon])
         info = {
             "current_time": self.current_time,
             "reward": self.last_reward,
@@ -94,7 +98,19 @@ class SatEnvironment(BaseEnvironment):
         self.end_id = 0
         self.dist_tot = 0.0
         self.last_reward = 0.0
-        
+
+        # lat e lon dei satelliti dell'osservazione
+        self.cur_lat = -190.0
+        self.cur_lon = -190.0
+        self.lat1 = -190.0
+        self.lon1 = -190.0
+        self.lat2 = -190.0
+        self.lon2 = -190.0
+        self.lat3 = -190.0
+        self.lon3 = -190.0
+        self.end_lat = -190.0
+        self.end_lon = -190.0
+
         super().reset(seed=seed)
 
         # Random flow
@@ -115,15 +131,29 @@ class SatEnvironment(BaseEnvironment):
         self.current_sat = self.start_id
         self.previous_sat = None
 
+        self.cur_lat = self.sat_by_id[self.current_sat]["lat"]
+        self.cur_lon = self.sat_by_id[self.current_sat]["lon"]
+        self.end_lat = self.sat_by_id[self.end_id]["lat"]
+        self.end_lon = self.sat_by_id[self.end_id]["lon"]
+
         # reward iniziale = 0 , usato in observation
         self.last_reward = 0.0
 
         # distanza totale accumulata
         self.dist_tot = 0.0
 
+        f_obs = self.compute_first_neighbors(self.current_sat)
+        # Aggiorno i variabili lat e lon dei vicini per l'osservazione
+        self.lat1 = f_obs[2]
+        self.lon1 = f_obs[3]
+        self.lat2 = f_obs[4]
+        self.lon2 = f_obs[5]
+        self.lat3 = f_obs[6]
+        self.lon3 = f_obs[7]
         obs, info = self.observation()
-        
-        return obs, info
+
+
+        return f_obs, info
 
 
     def step(self, action):
@@ -222,10 +252,8 @@ class SatEnvironment(BaseEnvironment):
 
         # Satellite iniziale
         cur_sat = self.sat_by_id[sat_id]
-        first_obs[0] = cur_sat["lat"]
-        first_obs[1] = cur_sat["lon"]
-
-        cur_lat = cur_sat["lat"] # Per controllo sulla latitudine
+        first_obs[0] = self.cur_lat
+        first_obs[1] = self.cur_lon
 
         neighbors = cur_sat["neighbors"]
         dirs = ["n", "s", "e", "w"]
@@ -234,7 +262,6 @@ class SatEnvironment(BaseEnvironment):
         
         has_none = any(neighbors[d] == "None" for d in dirs) # Controllo se esiste almeno un vicino "None"
         if has_none: # Salvo gli altri vicini validi
-            
             for d in dirs:
                 n_id = neighbors[d]
                 if n_id != "None":
@@ -245,7 +272,7 @@ class SatEnvironment(BaseEnvironment):
                 accepted_neighbors.append(int(neighbors[d]))
 
             # Regola su latitudine dove scarto la direzione n se sono sopra/sull'equatore e scarto direzione s se sono sotto l'equatore
-            if cur_lat >= 0:
+            if self.cur_lat >= 0:
                 # scarta nord (usa la posizione di "n" in dirs per scartare il valore corrispondente in accepted_neighbors)
                 accepted_neighbors.pop(dirs.index("n"))
             else:
@@ -260,9 +287,8 @@ class SatEnvironment(BaseEnvironment):
             idx += 2
 
         # Satellite finale
-        end_sat = self.sat_by_id[self.end_id]
-        first_obs[8] = end_sat["lat"]
-        first_obs[9] = end_sat["lon"]
+        first_obs[8] = self.end_lat
+        first_obs[9] = self.end_lon
 
         return first_obs
 
