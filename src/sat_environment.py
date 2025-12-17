@@ -32,6 +32,10 @@ class SatEnvironment(BaseEnvironment):
         with open(env_config["topology_file"], "r") as f:
             self.topologies = json.load(f)
 
+        # Peso per regolare reward step intermedio
+        self.w = env_config["reward_weight"]
+        print("parametro reward è", self.w)
+
         # Lookup topologie per time per accesso veloce
         self.topo_by_time = {t["time"]: t for t in self.topologies}
 
@@ -85,7 +89,8 @@ class SatEnvironment(BaseEnvironment):
         info = {
             "current_time": self.current_time,
             "reward": self.last_reward,
-            "current_sat": self.current_sat
+            "current_sat": self.current_sat,
+            "total_distance": self.dist_tot,
         }
 
         return obs, info
@@ -101,11 +106,11 @@ class SatEnvironment(BaseEnvironment):
        # Inizializza gli attributi prima di super
         self.current_sat = 0
         self.previous_sat = None
-        self.start_id =0
+        self.start_id = 0
         self.end_id = 0
-        self.dist_tot = 0.0
+        self.dist_tot = 0.0 # distanza totale accumulata
         self.last_reward = 0.0 # reward iniziale = 0 , usato in observation
-
+        self.current_time = self.min_time
         # lat e lon dei satelliti dell'osservazione
         self.cur_lat = -190.0
         self.cur_lon = -190.0
@@ -148,9 +153,6 @@ class SatEnvironment(BaseEnvironment):
         self.end_lat = self.sat_by_id[self.end_id]["lat"]
         self.end_lon = self.sat_by_id[self.end_id]["lon"]
 
-        # distanza totale accumulata
-        self.dist_tot = 0.0
-
         f_obs = self.compute_first_neighbors(self.current_sat)
         # Aggiorno i variabili lat e lon dei vicini per l'osservazione
         self.lat1 = f_obs[2]
@@ -172,6 +174,8 @@ class SatEnvironment(BaseEnvironment):
         La lat e lon del nuovo satellite corrente così come quelle dei suoi vicini
         escludendo il satellite da cui si arriva.
         """
+
+        self.current_time += self.time_step # update time
         s_obs, s_info = self.observation()
         print(" -- ACTION selected:", action) # DEBUG action
         idx = 2 + (action * 2)
@@ -180,14 +184,12 @@ class SatEnvironment(BaseEnvironment):
         print(" -- LAT selected by action:", act_lat) # DEBUG lat
 
         if act_lat < -189.0 and act_lon < -189.0 : # Vicino non valido, agente sta fermo e non fa nulla
-            self.last_reward = -0.1
-            self.current_time += self.time_step
+            self.last_reward = -1 # update reward
             done = False
             truncated = (self.current_time >= self.max_time)
-            if done:
-                print(" OOO Episodio completato con successo OOO ")
             if truncated:
                 print(" OOO Timeout OOO ")
+            print("reward None", self.last_reward) # DEBUG reward            
             return s_obs, self.last_reward, done, truncated, s_info
 
         # Aggiorna i valori che verranno usati dalla nuova osservazione
@@ -231,15 +233,11 @@ class SatEnvironment(BaseEnvironment):
         self.lat3, self.lon3 = lat_lon_values[2]
         print(" -- COPPIA lat lon 2:", lat_lon_values[2]) # DEBUG lat
         
-        # update time
-        self.current_time += self.time_step
-
-        # reward
-        reward = self.compute_reward()
+        reward = self.compute_reward() # Update reward
         self.last_reward = reward
 
         done = (self.current_sat == self.end_id)
-        truncated = (self.current_time >= self.max_time) # con truncated = done  l'agente impara a finire il tempo?
+        truncated = (self.current_time >= self.max_time)
         if done:
             print(" ooo episodio completato con successo ooo")
         if truncated:
@@ -258,14 +256,18 @@ class SatEnvironment(BaseEnvironment):
         """
         # Aggiorna distanza totale percorsa
         end_sat = self.sat_by_id[self.end_id]
-        self.dist_tot += self.sat_distance(self.sat_by_id[self.previous_sat], self.sat_by_id[self.current_sat])
+        self.dist_jump = self.sat_distance(self.sat_by_id[self.previous_sat], self.sat_by_id[self.current_sat])
+        self.dist_tot += self.dist_jump
 
         if self.current_sat == self.end_id: # Se ho raggiunto la destinazione
             start_sat = self.sat_by_id[self.start_id]
             dist_start_end = self.sat_distance(start_sat, end_sat)
             if self.dist_tot == 0:
                 return 1.0  # caso limite
-            return dist_start_end / self.dist_tot
+            reward = dist_start_end / self.dist_tot
+            print("reward raggiunta destinazione", reward) # DEBUG reward            
+            return reward
+
     
         # Vicini del previous_sat
         neighbors = self.sat_by_id[self.previous_sat]["neighbors"]
@@ -292,9 +294,11 @@ class SatEnvironment(BaseEnvironment):
 
         # Evita divisione per zero
         if d_far == d_near:
-            return 0.0
+            print ("- d_far uguale a d_near", d_far, d_near) # DEBUG reward
+            return 0.0 
 
-        reward = 1 - (d_current - d_near) / (d_far - d_near)
+        reward = (1 - (d_current - d_near) / (d_far - d_near))*self.w
+        print ("reward step è", reward) # DEBUG reward
         return reward
 
     def compute_first_neighbors(self, sat_id):

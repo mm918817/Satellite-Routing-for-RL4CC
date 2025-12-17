@@ -6,5 +6,6 @@ class SatCallbacks(BaseCallbacks):
     self.RELEVANT_KEYS = [
       "current_time",
       "reward",
-      "current_sat"
+      "current_sat",
+      "total_distance"
     ]
