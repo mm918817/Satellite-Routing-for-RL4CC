@@ -1,0 +1,9 @@
+{
+  "env_name": "SatEnvironment",
+  "min_time": 0,
+  "max_time": 3600,
+  "time_step": 10,
+  "flows_file": "flows_src__dst_timeline.json",
+  "topology_file": "satellite_topology.json",
+  "reward_weight": 1
+}

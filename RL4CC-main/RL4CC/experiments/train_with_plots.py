@@ -102,7 +102,14 @@ class TrainingExperimentWithPlots(TrainingExperiment):
                   isinstance(last_evaluation_values[0], int) or 
                     isinstance(last_evaluation_values[0], float)
           ):
-            last_evaluation_values = np.array(last_evaluation_values).flatten()
+            max_len = max(len(x) for x in last_evaluation_values)
+
+            padded = [
+                x + [np.nan] * (max_len - len(x))
+                for x in last_evaluation_values
+            ]
+
+            last_evaluation_values = np.array(padded).flatten()
           else:
             self.logger.err("Error: unknown type")
         else:

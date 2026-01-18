@@ -1,7 +1,7 @@
 import src
-from RL4CC.experiments.train import TrainingExperiment
+from RL4CC.experiments.train_with_plots import TrainingExperimentWithPlots
 
-exp = TrainingExperiment(
+exp = TrainingExperimentWithPlots(
     exp_config_file="exp_config.json"
 )
 exp.run()

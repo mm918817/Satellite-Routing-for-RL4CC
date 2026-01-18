@@ -7,13 +7,16 @@
   },
   "rollouts": {
     "num_rollout_workers": 1,
-    "duration_per_worker": 360,
-    "duration_unit": "timesteps"
+    "duration_per_worker": 5,
+    "duration_unit": "episodes"
   },
   "callbacks": {
     "callbacks_class": "callbacks.sat_callbacks.SatCallbacks"
   },
   "debugging": {
-    "log_level": "ERROR"
-  }
+    "log_level": "INFO"
+  },
+  "reporting": {
+  "keep_per_episode_custom_metrics": true
+}
 }

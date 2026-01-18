@@ -3,5 +3,5 @@ pyarrow==14.0.2
 ray[rllib]==2.20.0
 gymnasium
 pandas
-
+matplotlib
 geopy

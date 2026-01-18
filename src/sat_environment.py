@@ -32,6 +32,9 @@ class SatEnvironment(BaseEnvironment):
         with open(env_config["topology_file"], "r") as f:
             self.topologies = json.load(f)
 
+        # Peso per regolare reward step intermedio
+        self.w = env_config["reward_weight"]
+        
         # Lookup topologie per time per accesso veloce
         self.topo_by_time = {t["time"]: t for t in self.topologies}
 

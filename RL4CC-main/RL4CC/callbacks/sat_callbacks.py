@@ -1,6 +1,6 @@
-from RL4CC.callbacks import BaseCallbacks
+from RL4CC.callbacks.base_callbacks_for_plots import BaseCallbacksForPlots
 
-class SatCallbacks(BaseCallbacks):
+class SatCallbacks(BaseCallbacksForPlots):
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
     self.RELEVANT_KEYS = [
