@@ -7,7 +7,7 @@
   },
   "rollouts": {
     "num_rollout_workers": 1,
-    "duration_per_worker": 1,
+    "duration_per_worker": 5,
     "duration_unit": "episodes"
   },
   "callbacks": {
