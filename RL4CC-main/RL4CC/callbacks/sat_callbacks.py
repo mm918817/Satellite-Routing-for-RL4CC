@@ -5,7 +5,8 @@ class SatCallbacks(BaseCallbacks):
     super().__init__(*args, **kwargs)
     self.RELEVANT_KEYS = [
       "current_time",
-      "reward",
+      "step_reward",
+      "hole_counter",
       "current_sat",
       "total_distance"
     ]

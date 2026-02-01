@@ -33,9 +33,13 @@ class SatEnvironment(BaseEnvironment):
             self.topologies = json.load(f)
 
         # Peso per regolare reward step intermedio
-        self.w = env_config["reward_weight"]
-        print("parametro reward è", self.w)
+        self.w_step = env_config["step_weight"]
+        print("parametro reward per step è", self.w_step)
 
+        # Peso per regolare reward raggiunta la destinazione
+        self.w_dest = env_config["dest_weight"]
+        print("parametro reward raggiunta destinazione è", self.w_dest)
+        
         # Lookup topologie per time per accesso veloce
         self.topo_by_time = {t["time"]: t for t in self.topologies}
 
@@ -88,7 +92,8 @@ class SatEnvironment(BaseEnvironment):
                         self.end_lat, self.end_lon])
         info = {
             "current_time": self.current_time,
-            "reward": self.last_reward,
+            "step_reward": self.last_reward,
+            "hole_counter" : self.hole_counter,
             "current_sat": self.current_sat,
             "total_distance": self.dist_tot,
         }
@@ -111,6 +116,7 @@ class SatEnvironment(BaseEnvironment):
         self.dist_tot = 0.0 # distanza totale accumulata
         self.last_reward = 0.0 # reward iniziale = 0 , usato in observation
         self.current_time = self.min_time
+        self.hole_counter = 0
         # lat e lon dei satelliti dell'osservazione
         self.cur_lat = -190.0
         self.cur_lon = -190.0
@@ -185,6 +191,7 @@ class SatEnvironment(BaseEnvironment):
 
         if act_lat < -189.0 and act_lon < -189.0 : # Vicino non valido, agente sta fermo e non fa nulla
             self.last_reward = -1 # update reward
+            self.hole_counter += 1
             done = False
             truncated = (self.current_time >= self.max_time)
             if truncated:
@@ -251,8 +258,8 @@ class SatEnvironment(BaseEnvironment):
     def compute_reward(self):
         """
         Reward:
-        - Se current_sat è l'end_id ->  dist_start_end / self.dist_tot
-        - Altrimenti -> 1 - [(d(current, end) - d(near, end)) / (d(far, end) - d(near, end))]
+        - Se current_sat è l'end_id ->  dist_start_end / self.dist_tot  (reward se arrivo destinazione)
+        - Altrimenti -> 1 - [(d(current, end) - d(near, end)) / (d(far, end) - d(near, end))] (reward per step)
         """
         # Aggiorna distanza totale percorsa
         end_sat = self.sat_by_id[self.end_id]
@@ -264,7 +271,7 @@ class SatEnvironment(BaseEnvironment):
             dist_start_end = self.sat_distance(start_sat, end_sat)
             if self.dist_tot == 0:
                 return 1.0  # caso limite
-            reward = dist_start_end / self.dist_tot
+            reward = (dist_start_end / self.dist_tot)*self.w_dest
             print("reward raggiunta destinazione", reward) # DEBUG reward            
             return reward
 
@@ -297,7 +304,7 @@ class SatEnvironment(BaseEnvironment):
             print ("- d_far uguale a d_near", d_far, d_near) # DEBUG reward
             return 0.0 
 
-        reward = (1 - (d_current - d_near) / (d_far - d_near))*self.w
+        reward = (1 - (d_current - d_near) / (d_far - d_near))*self.w_step
         print ("reward step è", reward) # DEBUG reward
         return reward
 
