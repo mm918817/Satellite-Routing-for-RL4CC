@@ -1,8 +1,0 @@
-{
-  "experiment_start_timestamp": 1764607428.531311,
-  "last_iteration": 10,
-  "last_checkpoint_dir": "/root/ray_results/PPO_BaseEnvironment_2025-12-01_16-43-41nmdvlj9j/checkpoints/10",
-  "experiment_end_timestamp": 1764607439.036568,
-  "experiment_duration_s": 10.505257,
-  "avg_time_per_iter_s": 1.050526
-}
