@@ -32,6 +32,18 @@ class SatEnvironment(BaseEnvironment):
         with open(env_config["topology_file"], "r") as f:
             self.topologies = json.load(f)
 
+        with open(env_config["flows_dijkstra"], "r") as f:  # json con dijkstra calcolato per ogni flusso in ogni topologia
+            self.flows_dijkstra = json.load(f)
+
+        # Lookup Dijkstra: (time, start_id, end_id) -> item
+        self.dijkstra_by_key = {
+            (item["time"], item["start_id"], item["end_id"]): item
+            for item in self.flows_dijkstra
+        }
+
+        # Lookup topologie: (time) -> topologia associata
+        self.topo_by_time = {t["time"]: t for t in self.topologies}
+
         # Peso per regolare reward step intermedio
         self.w_step = env_config["step_weight"]
         print("parametro reward per step è", self.w_step)
@@ -40,8 +52,6 @@ class SatEnvironment(BaseEnvironment):
         self.w_dest = env_config["dest_weight"]
         print("parametro reward raggiunta destinazione è", self.w_dest)
         
-        # Lookup topologie per time per accesso veloce
-        self.topo_by_time = {t["time"]: t for t in self.topologies}
 
         return None  # seed, nel base_environment questa funzione restituisce un seed da passare al reset
 
@@ -96,6 +106,8 @@ class SatEnvironment(BaseEnvironment):
             "hole_counter" : self.hole_counter,
             "current_sat": self.current_sat,
             "total_distance": self.dist_tot,
+            "dest_reached": self.dest_reached,
+            "dijkstra_dist":self.dijkstra_dist
         }
 
         return obs, info
@@ -117,6 +129,8 @@ class SatEnvironment(BaseEnvironment):
         self.last_reward = 0.0 # reward iniziale = 0 , usato in observation
         self.current_time = self.min_time
         self.hole_counter = 0
+        self.dest_reached = 0
+        self.dijkstra_dist = 0.0 
         # lat e lon dei satelliti dell'osservazione
         self.cur_lat = -190.0
         self.cur_lon = -190.0
@@ -138,15 +152,24 @@ class SatEnvironment(BaseEnvironment):
         flow_time = self.current_flow["time"]
         print("FLOW:", self.current_flow) # DEBUG flow
 
+        # Recupero dijkstra per il flusso selezionato
+        key = (flow_time, self.start_id, self.end_id)
+        dijkstra_entry = self.dijkstra_by_key.get(key)
+        if dijkstra_entry is None:
+            raise ValueError(f"Nessun risultato Dijkstra per {key}")
+        self.dijkstra_dist = dijkstra_entry["distance_km"] # Distanza dijkstra da inizio a fine flusso
+        print("DIJKSTRA:", self.dijkstra_dist) # DEBUG dijkstra
+
+
         # Topologia associata al time
         self.topology = self.topo_by_time[flow_time]
 
-        # Lookup per i satelliti dell'attuale topologia
+        # Lookup per i satelliti dell'attuale topologia: (id) -> satellite
         self.sat_by_id = {
             sat["id"]: sat for sat in self.topology["satellites"]
         }
 
-        # Lookup per ottenere un satellite date le coordinate 
+        # Lookup per ottenere l'id di un satellite date le coordinate : (lat, lon) -> id sat
         self.sat_by_coords = {
             (sat["lat"], sat["lon"]): sat_id
             for sat_id, sat in self.sat_by_id.items()
@@ -160,7 +183,7 @@ class SatEnvironment(BaseEnvironment):
         self.end_lon = self.sat_by_id[self.end_id]["lon"]
 
         f_obs = self.compute_first_neighbors(self.current_sat)
-        # Aggiorno i variabili lat e lon dei vicini per l'osservazione
+        # Aggiorno le variabili lat e lon dei vicini per l'inizio, dalla prima osservazione
         self.lat1 = f_obs[2]
         self.lon1 = f_obs[3]
         self.lat2 = f_obs[4]
@@ -180,6 +203,9 @@ class SatEnvironment(BaseEnvironment):
         La lat e lon del nuovo satellite corrente così come quelle dei suoi vicini
         escludendo il satellite da cui si arriva.
         """
+        terminated = False
+        truncated = False
+
 
         self.current_time += self.time_step # update time
         s_obs, s_info = self.observation()
@@ -192,12 +218,21 @@ class SatEnvironment(BaseEnvironment):
         if act_lat < -189.0 and act_lon < -189.0 : # Vicino non valido, agente sta fermo e non fa nulla
             self.last_reward = -1 # update reward
             self.hole_counter += 1
-            done = False
-            truncated = (self.current_time >= self.max_time)
-            if truncated:
-                print(" OOO Timeout OOO ")
+ 
+            s_obs, s_info = self.observation() # Per aggiornare il valore di hole_counter
+
+            blocked = (self.hole_counter >=5) # Se sto fermo almeno 5 volte
+            if blocked:
+                print(" OOO Agente fermo per troppi step OOO ")
+                truncated = True
+            timeout = (self.current_time >= self.max_time and not blocked)
+            if timeout:
+                print(" OOO Timeout OOO ") 
+                truncated = True
             print("reward None", self.last_reward) # DEBUG reward            
-            return s_obs, self.last_reward, done, truncated, s_info
+            return s_obs, self.last_reward, terminated, truncated, s_info
+
+        # self.hole_counter = 0  # Per resettare il counter se l'agente si libera dal vicolo cieco prima del cap
 
         # Aggiorna i valori che verranno usati dalla nuova osservazione
         self.cur_lat = act_lat
@@ -210,22 +245,25 @@ class SatEnvironment(BaseEnvironment):
         new_neighbors = cur_info["neighbors"]
         dirs = ["n", "s", "e", "w"]
 
+        seen = set() # Per tenere traccia se ri ripete un satellite tra i vicini
         filtered_neighbors = [] # Rimuove satellite da cui sono arrivato
+        
         for d in dirs:
             n_id = new_neighbors[d]
-            if n_id == "None":
-                filtered_neighbors.append("None")
-            else:
+            if n_id != "None":
                 n_id = int(n_id)
-                if n_id != self.previous_sat:
+                # Ignora se è il sat precedente e se è già stato messo (per evitare stesso vicino 2 volte)
+                if n_id != self.previous_sat and n_id not in seen:
                     filtered_neighbors.append(n_id)
+                    seen.add(n_id)
 
         while len(filtered_neighbors) < 3: # Controllo per quando ho 2 volte lo stesso vicino, ed ho solo 2 valori in filtered_neighbors
             filtered_neighbors.append("None")
 
         lat_lon_values = [] # Recupera lat e lon dei nuovi vicini ed aggiorna i valori dell'osservazione
+        
         for n_id in filtered_neighbors:
-            if n_id == "None":
+            if n_id == "None": # Se è None assegna valori sfavorevoli
                 lat_lon_values.append((-190.0, -190.0))
             else:
                 sat = self.sat_by_id[n_id]
@@ -243,50 +281,56 @@ class SatEnvironment(BaseEnvironment):
         reward = self.compute_reward() # Update reward
         self.last_reward = reward
 
-        done = (self.current_sat == self.end_id)
+        terminated = (self.current_sat == self.end_id)
         truncated = (self.current_time >= self.max_time)
-        if done:
+        if terminated:
             print(" ooo episodio completato con successo ooo")
-        if truncated:
+        if truncated and not terminated:
             print(" ooo Timeout ooo")
+            reward = -1
+            self.last_reward = reward
 
         obs, info = self.observation()
 
-        return obs, reward, done, truncated, info
+        return obs, reward, terminated, truncated, info
 
 
     def compute_reward(self):
         """
         Reward:
-        - Se current_sat è l'end_id ->  dist_start_end / self.dist_tot  (reward se arrivo destinazione)
-        - Altrimenti -> 1 - [(d(current, end) - d(near, end)) / (d(far, end) - d(near, end))] (reward per step)
+        - (DESTINAZIONE) Se current_sat è l'end_id ->  self.dijkstra_dist / self.dist_tot
+        - (STEP) Altrimenti -> 1 - [(d(current, end) - d(near, end)) / (d(far, end) - d(near, end))]
+        -- Nel secondo caso, calcolo per il sat scelto rispetto ai sat disponibili dal precedente satellite
+        -- Vengono scartati i sat None e si considerano solo satelliti dove è possibile calcolare le distanze
         """
         # Aggiorna distanza totale percorsa
         end_sat = self.sat_by_id[self.end_id]
         self.dist_jump = self.sat_distance(self.sat_by_id[self.previous_sat], self.sat_by_id[self.current_sat])
         self.dist_tot += self.dist_jump
 
+     # --- REWARD DESTINAZIONE ---
         if self.current_sat == self.end_id: # Se ho raggiunto la destinazione
-            start_sat = self.sat_by_id[self.start_id]
-            dist_start_end = self.sat_distance(start_sat, end_sat)
-            if self.dist_tot == 0:
-                return 1.0  # caso limite
-            reward = (dist_start_end / self.dist_tot)*self.w_dest
+            # Non tiene conto della divisione zero, ma i file flussi non possono avere stesso inizio e destinazione
+            #reward = (self.dijkstra_dist / self.dist_tot)*self.w_dest
+            reward = 1
+            self.dest_reached = 1
             print("reward raggiunta destinazione", reward) # DEBUG reward            
             return reward
 
-    
+        # --- REWARD STEP ---
         # Vicini del previous_sat
         neighbors = self.sat_by_id[self.previous_sat]["neighbors"]
 
-        # Converte in interi o None
+        # Converte in interi, sono i vicini del sat "precedente"
+        # Quindi ho almeno il sat da cui siamo arrivati al "precedente" ed il sat scelto in questo step (cioè dal "precedente")
         neighbor_ids = []
         for d in ["n", "s", "e", "w"]:
             n = neighbors[d]
             if n != "None":
                 neighbor_ids.append(int(n))
         if not neighbor_ids:
-            return -0.01  # fallback se non ci sono vicini validi, dovrebbe tenere almeno il satellite da cui arriviamo e quello in cui siamo arrivati
+            print ("-- ERRORE -- vicini non esistenti ")
+            # return -1  # Fallback se non ci sono vicini validi, non dovrebbe capitare
 
         # Calcola le distanze rispetto a end_id
         distances = {nid: self.sat_distance(self.sat_by_id[nid], end_sat) for nid in neighbor_ids}
@@ -299,21 +343,27 @@ class SatEnvironment(BaseEnvironment):
         d_near = distances[near_sat_id]
         d_far = distances[far_sat_id]
 
-        # Evita divisione per zero
+        # Evita divisione per zero (non dovrebbe succedere mai)
         if d_far == d_near:
             print ("- d_far uguale a d_near", d_far, d_near) # DEBUG reward
             return 0.0 
-
-        reward = (1 - (d_current - d_near) / (d_far - d_near))*self.w_step
+        # Non posso avere divisione per zero, perchè ho sempre almeno un satellite da cui arrivo ed uno dove posso andare per le distanze
+        # Molto difficilmente hanno esattamente la stessa distanza dalla destinazione, 
+        # ed il caso vicini tutti None è gestito implicitamente nello step (se non ho action valida sto fermo) 
+        reward = ((1 - (d_current - d_near) / (d_far - d_near))*self.w_step)
         print ("reward step è", reward) # DEBUG reward
         return reward
 
     def compute_first_neighbors(self, sat_id):
         """
-        Crea un'osservazione iniziale, con i vicini validi scelti in base ai criteri:
-        -Se per il sat iniziale ho un satellite vicino "None" lo scarto e tengo gli altri vicini
-        -Altrimenti dei satelliti vicini ordino in base alla distanza da quello finale e scarto il più lontano
-
+        - Crea un array per i 10 valori delle coordinate che poi ritornerà
+        
+        - Aggiorna i valori per l'osservazione iniziale, con i 3 vicini validi scelti in base ai criteri:
+        -- Se per il sat iniziale ho un satellite vicino "None" lo scarto e tengo gli altri vicini 
+        (se ho 2 None considero un'altra volta il satellite migliore, 
+        non dovrebbe capitare 3 None perchè le stazioni non sono vicine a fasce dei poli, ma nel caso dovrebbe prendere 3 volte la stessa scelta)
+        -- Altrimenti dei satelliti vicini ordino in base alla distanza da quello finale e scarto il più lontano
+        
         [cur_lat, cur_lon,
         lat1, lon1,
         lat2, lon2,
@@ -352,11 +402,18 @@ class SatEnvironment(BaseEnvironment):
 
             # Salva solo gli id ordinati dalle tuple in distances
             accepted_neighbors = [n_id for n_id, _ in distances]
+       
+        # Controllo se ho più di un None iniziale e dare più probabilità al sat migliore
+        if 0 < len(accepted_neighbors) < 3:
+            best_neighbor = accepted_neighbors[0]
+            while len(accepted_neighbors) < 3:
+                accepted_neighbors.insert(0, best_neighbor)
 
         # Inserisce lat e lon dei 3 vicini accettati
         idx = 2
         for n_id in accepted_neighbors[:3]: 
             n_sat = self.sat_by_id[n_id]
+            print ("SATELLITE VICINO ---", n_sat) # DEBUG first neighbors
             first_obs[idx] = n_sat["lat"]
             first_obs[idx + 1] = n_sat["lon"]
             idx += 2

@@ -8,5 +8,7 @@ class SatCallbacks(BaseCallbacks):
       "step_reward",
       "hole_counter",
       "current_sat",
-      "total_distance"
+      "total_distance",
+      "dest_reached",
+      "dijkstra_dist"
     ]

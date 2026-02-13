@@ -1,10 +1,11 @@
 {
   "env_name": "SatEnvironment",
   "min_time": 0,
-  "max_time": 3600,
+  "max_time": 300,
   "time_step": 10,
   "flows_file": "flows_src__dst_timeline.json",
   "topology_file": "satellite_topology.json",
-  "step_weight": 1,
+  "flows_dijkstra": "dijkstra_results.json",
+  "step_weight": 0,
   "dest_weight":1
 }

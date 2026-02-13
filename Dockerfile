@@ -27,7 +27,9 @@ COPY env_config.json .
 COPY ray_config.json .
 COPY src ./src
 COPY flows_src__dst_timeline.json .
+COPY flows_eval.json .
 COPY satellite_topology.json .
+COPY dijkstra_results.json .
 
 # Installa RL4CC
 WORKDIR /app/RL4CC-main
