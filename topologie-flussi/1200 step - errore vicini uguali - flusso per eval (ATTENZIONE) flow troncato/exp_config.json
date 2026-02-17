@@ -2,18 +2,8 @@
   "algorithm": "DQN",
   "env_config_file": "env_config.json",
   "ray_config_file": "ray_config.json",
-  "evaluation": {
-    "evaluation_interval": 5,
-    "evaluation_duration": 10,
-    "evaluation_duration_unit": "episodes",
-    "evaluation_config": {
-      "env_config": {
-        "flows_file": "flows_eval.json",
-        "mode": "eval"
-      }
-    }
-  },
+  "evaluation_interval": 5,
   "stopping_criteria": {
-    "max_iterations": 1000
+    "max_iterations": 15
   }
 }

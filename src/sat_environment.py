@@ -25,6 +25,11 @@ class SatEnvironment(BaseEnvironment):
         """
         super().load_configuration(env_config)
 
+        self.is_evaluation = env_config.get("is_evaluation", False) # Flag se sono in evaluation
+
+        if self.is_evaluation: # Se in eval, inizializza contatore sequenziale flussi
+                self.flow_index = 0
+
         # Caricamento file JSON dai file di config
         with open(env_config["flows_file"], "r") as f:
             self.flows = json.load(f)
@@ -131,6 +136,8 @@ class SatEnvironment(BaseEnvironment):
         self.hole_counter = 0
         self.dest_reached = 0
         self.dijkstra_dist = 0.0 
+        self.dijkstra_hop = 0
+        self.step_counter = 0
         # lat e lon dei satelliti dell'osservazione
         self.cur_lat = -190.0
         self.cur_lon = -190.0
@@ -143,10 +150,19 @@ class SatEnvironment(BaseEnvironment):
         self.end_lat = -190.0
         self.end_lon = -190.0
 
+        
         super().reset(seed=seed)
 
-        # Random flow
-        self.current_flow = np.random.choice(self.flows)
+        if self.is_evaluation:
+            # Selezione flow SEQUENZIALE per la valutazione
+            self.current_flow = self.flows[self.flow_index]        
+            self.flow_index = (self.flow_index + 1) % len(self.flows)
+            print(f"EVAL FLOW (Index {self.flow_index}):", self.current_flow)
+        else:
+            # Selezione flow RANDOM per il training
+            self.current_flow = np.random.choice(self.flows)
+            print("TRAIN FLOW (Random):", self.current_flow)
+
         self.start_id = self.current_flow["start_id"]
         self.end_id = self.current_flow["end_id"]
         flow_time = self.current_flow["time"]
@@ -158,7 +174,8 @@ class SatEnvironment(BaseEnvironment):
         if dijkstra_entry is None:
             raise ValueError(f"Nessun risultato Dijkstra per {key}")
         self.dijkstra_dist = dijkstra_entry["distance_km"] # Distanza dijkstra da inizio a fine flusso
-        print("DIJKSTRA:", self.dijkstra_dist) # DEBUG dijkstra
+        self.dijkstra_hop = (len(dijkstra_entry["path"])-1) # Hop dijkstra da inizio a fine flusso
+        print(f"DIJKSTRA: distanza {self.dijkstra_dist}, hop {self.dijkstra_hop}") # DEBUG dijkstra
 
 
         # Topologia associata al time
@@ -208,6 +225,7 @@ class SatEnvironment(BaseEnvironment):
 
 
         self.current_time += self.time_step # update time
+        self.step_counter += 1 
         s_obs, s_info = self.observation()
         print(" -- ACTION selected:", action) # DEBUG action
         idx = 2 + (action * 2)
@@ -311,8 +329,8 @@ class SatEnvironment(BaseEnvironment):
      # --- REWARD DESTINAZIONE ---
         if self.current_sat == self.end_id: # Se ho raggiunto la destinazione
             # Non tiene conto della divisione zero, ma i file flussi non possono avere stesso inizio e destinazione
-            #reward = (self.dijkstra_dist / self.dist_tot)*self.w_dest
-            reward = 1
+            #reward = (self.dijkstra_dist / self.dist_tot)*self.w_dest # Reward destinazione dinamico
+            reward = 1 # Reward destinazione fisso ad 1
             self.dest_reached = 1
             print("reward raggiunta destinazione", reward) # DEBUG reward            
             return reward
@@ -349,8 +367,13 @@ class SatEnvironment(BaseEnvironment):
             return 0.0 
         # Non posso avere divisione per zero, perchè ho sempre almeno un satellite da cui arrivo ed uno dove posso andare per le distanze
         # Molto difficilmente hanno esattamente la stessa distanza dalla destinazione, 
-        # ed il caso vicini tutti None è gestito implicitamente nello step (se non ho action valida sto fermo) 
-        reward = ((1 - (d_current - d_near) / (d_far - d_near))*self.w_step)
+        # ed il caso vicini tutti None è gestito implicitamente nello step (se non ho action valida sto fermo)
+        step_dyn_reward = ((1 - (d_current - d_near) / (d_far - d_near))) 
+        if self.step_counter <= self.dijkstra_hop: # Reward step (1/30*dinamico) se impiego <= step di dijkstra, altrimenti -(1/30*dinamico), mettendo w_step ad 1
+            reward = ((1/30)*step_dyn_reward*self.w_step) # 1/30 perchè 30 è il numero max di step per episodio
+        else:
+            reward = -((1/30)*step_dyn_reward*self.w_step)
+        #reward = ((1 - (d_current - d_near) / (d_far - d_near))*self.w_step) # Reward step dinamico in base a bontà del vicino scelto
         print ("reward step è", reward) # DEBUG reward
         return reward
 

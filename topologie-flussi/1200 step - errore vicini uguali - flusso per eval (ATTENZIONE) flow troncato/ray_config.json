@@ -2,7 +2,7 @@
   "training": {
     "batch_size": 128,
     "num_train_batches": 2,
-    "lr": 0.001,
+    "lr": 0.01,
     "gamma": 0.99,
     "num_steps_sampled_before_learning_starts": 0,
     "model": {
@@ -17,7 +17,6 @@
   },
   "evaluation": {
     "evaluation_config": {
-      "explore": false,
       "flows_file": "flows_eval.json",
       "is_evaluation": true
     }
