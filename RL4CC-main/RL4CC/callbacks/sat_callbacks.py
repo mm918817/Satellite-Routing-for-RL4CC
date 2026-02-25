@@ -10,5 +10,6 @@ class SatCallbacks(BaseCallbacks):
       "current_sat",
       "total_distance",
       "dest_reached",
-      "dijkstra_dist"
+      "dijkstra_dist",
+      "dijkstra_hop"
     ]

@@ -1,12 +1,12 @@
 {
   "training": {
-    "batch_size": 128,
+    "batch_size": 256,
     "num_train_batches": 2,
     "lr": 0.001,
     "gamma": 0.99,
     "num_steps_sampled_before_learning_starts": 0,
     "model": {
-      "fcnet_hiddens": [128, 128],
+      "fcnet_hiddens": [256, 128, 256],
       "fcnet_activation": "relu"
     },
     "replay_buffer_config": {

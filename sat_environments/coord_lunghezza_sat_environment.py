@@ -56,7 +56,7 @@ class SatEnvironment(BaseEnvironment):
         # Peso per regolare reward raggiunta la destinazione
         self.w_dest = env_config["dest_weight"]
         print("parametro reward raggiunta destinazione è", self.w_dest)
-        
+
 
         return None  # seed, nel base_environment questa funzione restituisce un seed da passare al reset
 
@@ -67,11 +67,13 @@ class SatEnvironment(BaseEnvironment):
          - del satellite attuale
          - dei 3 suoi vicini(si toglie il satellite precedente)
          - del satellite finale
+         - per il sat attuale ed i 3 vicini anche la distanza rispetto ad end_id
         [cur_lat, cur_lon,
         lat1, lon1,
         lat2, lon2,
-        lat3, lon3,
-        end_lat, end_lon]
+        lat3, lon3, 
+        end_lat, end_lon
+        cur_dist, d1, d2, d3]
         """
         # Tutti i satelliti possibili
         #self.valid_sat_ids = sorted([100, 102, 103, 104, 106, 107, 108, 109, 110, 111, 112, 113, 114, 116, 117, 118, 119, 
@@ -83,10 +85,31 @@ class SatEnvironment(BaseEnvironment):
         self.min_lat_lon = -190
         self.max_lat_lon = 190
 
+
+        self.min_dist = 0.0
+        self.max_dist = 25000.0  # Rispetto al percorso di dijkstra più lungo (non è la distanza agli antipodi maggiore possibile)
+
+        low = np.array([
+            self.min_lat_lon, self.min_lat_lon,   # satellite corrente (cur)
+            self.min_lat_lon, self.min_lat_lon,   # Vicino n1
+            self.min_lat_lon, self.min_lat_lon,   # Vicino n2
+            self.min_lat_lon, self.min_lat_lon,   # Vicino n3
+            self.min_lat_lon, self.min_lat_lon,   # end
+            self.min_dist, self.min_dist, self.min_dist, self.min_dist # Distanze dalla fine per cur, e vicini 1,2 e 3
+        ], dtype=np.float32)
+
+        high = np.array([
+            self.max_lat_lon, self.max_lat_lon,
+            self.max_lat_lon, self.max_lat_lon,
+            self.max_lat_lon, self.max_lat_lon,
+            self.max_lat_lon, self.max_lat_lon,
+            self.max_lat_lon, self.max_lat_lon,
+            self.max_dist, self.max_dist, self.max_dist, self.max_dist
+        ], dtype=np.float32)
+
         self.observation_space = Box(
-            low = self.min_lat_lon,
-            high = self.max_lat_lon,
-            shape = (10,),
+            low = low,
+            high = high,
             dtype = np.float32
         )
 
@@ -100,11 +123,14 @@ class SatEnvironment(BaseEnvironment):
 
 
     def observation(self):
-        obs = np.array([self.cur_lat, self.cur_lon,
-                        self.lat1, self.lon1,
-                        self.lat2, self.lon2,
-                        self.lat3, self.lon3,
-                        self.end_lat, self.end_lon])
+        obs = np.array([
+            self.cur_lat, self.cur_lon, 
+            self.lat1, self.lon1,
+            self.lat2, self.lon2,
+            self.lat3, self.lon3,
+            self.end_lat, self.end_lon,
+            self.cur_dist, self.d1, self.d2, self.d3,])
+        
         info = {
             "current_time": self.current_time,
             "step_reward": self.last_reward,
@@ -114,7 +140,6 @@ class SatEnvironment(BaseEnvironment):
             "dest_reached": self.dest_reached,
             "dijkstra_dist":self.dijkstra_dist,
             "dijkstra_hop":self.dijkstra_hop,
-
         }
 
         return obs, info
@@ -137,9 +162,9 @@ class SatEnvironment(BaseEnvironment):
         self.current_time = self.min_time
         self.hole_counter = 0
         self.dest_reached = 0
-        self.dijkstra_dist = 0.0 
+        self.dijkstra_dist = 0.0
         self.dijkstra_hop = 0
-        self.step_counter = 0
+        self.step_counter = 0        
         # lat e lon dei satelliti dell'osservazione
         self.cur_lat = -190.0
         self.cur_lon = -190.0
@@ -151,8 +176,12 @@ class SatEnvironment(BaseEnvironment):
         self.lon3 = -190.0
         self.end_lat = -190.0
         self.end_lon = -190.0
+        # Distanze dalla destinazione
+        self.cur_dist = 0
+        self.d1 = 0
+        self.d2 = 0
+        self.d3 = 0
 
-        
         super().reset(seed=seed)
 
         if self.is_evaluation:
@@ -164,6 +193,7 @@ class SatEnvironment(BaseEnvironment):
             # Selezione flow RANDOM per il training
             self.current_flow = np.random.choice(self.flows)
             print("TRAIN FLOW (Random):", self.current_flow)
+
 
         self.start_id = self.current_flow["start_id"]
         self.end_id = self.current_flow["end_id"]
@@ -203,6 +233,7 @@ class SatEnvironment(BaseEnvironment):
 
         f_obs = self.compute_first_neighbors(self.current_sat)
         # Aggiorno le variabili lat e lon dei vicini per l'inizio, dalla prima osservazione
+        # Aggiorna direttamente anche i valori delle distanze (d1, d2 ,d3)
         self.lat1 = f_obs[2]
         self.lon1 = f_obs[3]
         self.lat2 = f_obs[4]
@@ -220,7 +251,7 @@ class SatEnvironment(BaseEnvironment):
         """
         In base all'action presa imposta i nuovi valori usati dall'osservazione:
         La lat e lon del nuovo satellite corrente così come quelle dei suoi vicini
-        escludendo il satellite da cui si arriva.
+        escludendo il satellite da cui si arriva. E le distanze rispetto la destinazione
         """
         terminated = False
         truncated = False
@@ -238,7 +269,7 @@ class SatEnvironment(BaseEnvironment):
         if act_lat < -189.0 and act_lon < -189.0 : # Vicino non valido, agente sta fermo e non fa nulla
             self.last_reward = -1 # update reward
             self.hole_counter += 1
- 
+
             s_obs, s_info = self.observation() # Per aggiornare il valore di hole_counter
 
             blocked = (self.hole_counter >=5) # Se sto fermo almeno 5 volte
@@ -262,6 +293,8 @@ class SatEnvironment(BaseEnvironment):
         self.current_sat = self.sat_by_coords[(self.cur_lat, self.cur_lon)]
         cur_info = self.sat_by_id[self.current_sat]
 
+        self.cur_dist = self.sat_distance(cur_info, self.sat_by_id[self.end_id]) # calcolo distanza per sat corrente
+
         new_neighbors = cur_info["neighbors"]
         dirs = ["n", "s", "e", "w"]
 
@@ -281,13 +314,17 @@ class SatEnvironment(BaseEnvironment):
             filtered_neighbors.append("None")
 
         lat_lon_values = [] # Recupera lat e lon dei nuovi vicini ed aggiorna i valori dell'osservazione
-        
-        for n_id in filtered_neighbors:
+        distance_values = [] # Recupera la distanza dei nuovi vicini rispetto alla fine ed aggiorna i valori dell'obs
+
+        for n_id in filtered_neighbors: 
             if n_id == "None": # Se è None assegna valori sfavorevoli
                 lat_lon_values.append((-190.0, -190.0))
+                distance_values.append(self.max_dist)
             else:
                 sat = self.sat_by_id[n_id]
                 lat_lon_values.append((sat["lat"], sat["lon"]))
+                d = self.sat_distance(sat, self.sat_by_id[self.end_id])
+                distance_values.append(d)
 
         print(" -- salto da",self.previous_sat, self.current_sat)
         print(" -- tutto lat lon",lat_lon_values)
@@ -298,6 +335,13 @@ class SatEnvironment(BaseEnvironment):
         self.lat3, self.lon3 = lat_lon_values[2]
         print(" -- COPPIA lat lon 2:", lat_lon_values[2]) # DEBUG lat
         
+        self.d1 = distance_values[0]
+        print(" -- distanza sat 0:", distance_values[0]) # DEBUG distanza
+        self.d2 = distance_values[1]
+        print(" -- distanza sat 1:", distance_values[1]) # DEBUG distanza
+        self.d3 = distance_values[2]
+        print(" -- distanza sat 2:", distance_values[2]) # DEBUG distanza
+
         reward = self.compute_reward() # Update reward
         self.last_reward = reward
 
@@ -322,18 +366,19 @@ class SatEnvironment(BaseEnvironment):
         - (STEP) Altrimenti -> 1 - [(d(current, end) - d(near, end)) / (d(far, end) - d(near, end))]
         -- Nel secondo caso, calcolo per il sat scelto rispetto ai sat disponibili dal precedente satellite
         -- Vengono scartati i sat None e si considerano solo satelliti dove è possibile calcolare le distanze
+
         """
         # Aggiorna distanza totale percorsa
         end_sat = self.sat_by_id[self.end_id]
         self.dist_jump = self.sat_distance(self.sat_by_id[self.previous_sat], self.sat_by_id[self.current_sat])
         self.dist_tot += self.dist_jump
 
-     # --- REWARD DESTINAZIONE ---
+        # --- REWARD DESTINAZIONE ---
         if self.current_sat == self.end_id: # Se ho raggiunto la destinazione
-            # Non tiene conto della divisione zero, ma i file flussi non possono avere stesso inizio e destinazione
-            #reward = (self.dijkstra_dist / self.dist_tot)*self.w_dest # Reward destinazione dinamico
-            reward = 1 # Reward destinazione fisso ad 1
-            self.dest_reached = 1
+            # Non tiene conto della divisione per zero, ma i file flussi non possono avere stesso inizio e destinazione
+            reward = (self.dijkstra_dist / self.dist_tot)*self.w_dest # Reward destinazione dinamico
+            #reward = 1 # Reward destinazione fisso ad 1
+            self.dest_reached = 1   
             print("reward raggiunta destinazione", reward) # DEBUG reward            
             return reward
 
@@ -342,7 +387,7 @@ class SatEnvironment(BaseEnvironment):
         neighbors = self.sat_by_id[self.previous_sat]["neighbors"]
 
         # Converte in interi, sono i vicini del sat "precedente"
-        # Quindi ho almeno il sat da cui siamo arrivati al "precedente" ed il sat scelto in questo step (cioè dal "precedente")
+        # Quindi ho almeno il sat da cui siamo arrivati al "precedente" ed il sat scelto in questo step (cioè dal "precedente") 
         neighbor_ids = []
         for d in ["n", "s", "e", "w"]:
             n = neighbors[d]
@@ -368,39 +413,43 @@ class SatEnvironment(BaseEnvironment):
             print ("- d_far uguale a d_near", d_far, d_near) # DEBUG reward
             return 0.0 
         # Non posso avere divisione per zero, perchè ho sempre almeno un satellite da cui arrivo ed uno dove posso andare per le distanze
-        # Molto difficilmente hanno esattamente la stessa distanza dalla destinazione, 
-        # ed il caso vicini tutti None è gestito implicitamente nello step (se non ho action valida sto fermo)
+        # Molto difficilmente hanno essattamente la stessa distanza dalla destinazione, 
+        # ed il caso vicini tutti None è gestito implicitamente nello step (se non ho action valida sto fermo) 
         step_dyn_reward = ((1 - (d_current - d_near) / (d_far - d_near))) 
-        if self.step_counter <= self.dijkstra_hop: # Reward step (1/30*dinamico) se impiego <= step di dijkstra, altrimenti -(1/30*dinamico), mettendo w_step ad 1
-            reward = ((1/30)*step_dyn_reward*self.w_step) # 1/30 perchè 30 è il numero max di step per episodio
-        else:
-            reward = -((1/30)*step_dyn_reward*self.w_step)
-        #reward = ((1 - (d_current - d_near) / (d_far - d_near))*self.w_step) # Reward step dinamico in base a bontà del vicino scelto
+        # self.step_counter <= self.dijkstra_hop: # Reward step (1/30*dinamico) se impiego <= step di dijkstra, altrimenti -(1/30*dinamico), mettendo w_step ad 1
+        #    reward = ((1/30)*step_dyn_reward*self.w_step) # 1/30 perchè 30 è il numero max di step per episodio
+        #else:
+        #    reward = -((1/30)*step_dyn_reward*self.w_step)
+        reward = ((1 - (d_current - d_near) / (d_far - d_near))*self.w_step) # Reward step dinamico in base a bontà del vicino scelto
         print ("reward step è", reward) # DEBUG reward
         return reward
 
     def compute_first_neighbors(self, sat_id):
         """
-        - Crea un array per i 10 valori delle coordinate che poi ritornerà
+        - Crea un array per i 10 valori delle coordinate che poi ritornerà, mentre aggiorna direttamente i valori delle distanze
         
         - Aggiorna i valori per l'osservazione iniziale, con i 3 vicini validi scelti in base ai criteri:
         -- Se per il sat iniziale ho un satellite vicino "None" lo scarto e tengo gli altri vicini 
         (se ho 2 None considero un'altra volta il satellite migliore, 
         non dovrebbe capitare 3 None perchè le stazioni non sono vicine a fasce dei poli, ma nel caso dovrebbe prendere 3 volte la stessa scelta)
         -- Altrimenti dei satelliti vicini ordino in base alla distanza da quello finale e scarto il più lontano
-        
+       
+    
         [cur_lat, cur_lon,
         lat1, lon1,
         lat2, lon2,
-        lat3, lon3,
-        end_lat, end_lon]
+        lat3, lon3, 
+        end_lat, end_lon
+        cur_dist, d1, d2, d3]
         """
+        
         first_obs = np.full(10, self.min_lat_lon, dtype=np.float64)
 
         # Satellite iniziale
         cur_sat = self.sat_by_id[sat_id]
         first_obs[0] = self.cur_lat
         first_obs[1] = self.cur_lon
+        self.cur_dist = self.sat_distance(cur_sat, self.sat_by_id[self.end_id]) # calcolo distanza per sat corrente iniziale
 
         neighbors = cur_sat["neighbors"]
         dirs = ["n", "s", "e", "w"]
@@ -427,13 +476,13 @@ class SatEnvironment(BaseEnvironment):
 
             # Salva solo gli id ordinati dalle tuple in distances
             accepted_neighbors = [n_id for n_id, _ in distances]
-       
+
         # Controllo se ho avuto più di un None iniziale faccio padding, inserendo dall'inizio, con sat migliore fino ad avere 3 sat
         if 0 < len(accepted_neighbors) < 3:
             best_neighbor = accepted_neighbors[0]
             while len(accepted_neighbors) < 3:
                 accepted_neighbors.insert(0, best_neighbor)
-
+        
         # Inserisce lat e lon dei 3 vicini accettati (i più vicini), valori first_obs[da 2 a 7]
         idx = 2
         for n_id in accepted_neighbors[:3]: 
@@ -443,6 +492,9 @@ class SatEnvironment(BaseEnvironment):
             first_obs[idx + 1] = n_sat["lon"]
             idx += 2
 
+        # Calcola le distanze dei 3 satelliti più vicini che saranno quelli i vicini iniziali
+        self.d1, self.d2, self.d3 = [self.sat_distance(self.sat_by_id[n_id], self.sat_by_id[self.end_id]) for n_id in accepted_neighbors[:3]]
+        
         # Satellite finale
         first_obs[8] = self.end_lat
         first_obs[9] = self.end_lon
