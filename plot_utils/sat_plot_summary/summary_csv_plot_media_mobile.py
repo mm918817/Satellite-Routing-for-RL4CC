@@ -11,21 +11,25 @@ X_SCALE = 5 # Evaluation ogni 5 iterazioni, nel summary.csv sono salvate ogni 1
 WINDOW_SIZE = 10  # Media mobile su 10 punti (50 iterazioni reali se X_SCALE=5)
 
 # Parametri per la penalità
-MAX_PENALTY = 350 # Valore assegnato ad ogni flusso NON concluso (eg: 350%, usare il massimo tra i vari summary)
+MAX_PENALTY = 140 # Valore assegnato ad ogni flusso NON concluso (eg: 350%, usare il massimo tra i vari summary, o provare prima con 0 e vedere il valore massimo che esce)
 TOT_FLOWS = 10 # Numero di flussi per ogni valutazione
 
 # File summary.csv da includere
 files_to_plot = [
-    "dest 1, step 0, h5, lr 0.001, gamma 0.99, nn128, 2000 iter",
-    "dest 1, step dijk30, h5, lr 0.001, gamma 0.99, nn128, 2000 iter",
-    "dest din, step 0, h5, lr 0.001, gamma 0.99, nn128, 2000 iter",
-    "dest din, step dijk30, h5, lr 0.001, gamma 0.99, nn128, 2000 iter",
+    "tuning, dest din, step dijk30, h5, lr 0.00017, gamma 0.977, nn256-128-256, 2000 iter",
+    "tuning, dest din, step dijk30, h5, lr 0.00017, gamma 0.977, nn256-128-256, 4000 iter"
+
 ]
 
 # Stile linee (se non specificato usa il default di Matplotlib)
 file_styles = {
-    "dest 1, step 0, h5, lr 0.001, gamma 0.99, nn128, 2000 iter": {"color": "black", "linestyle": "-", "linewidth": 2.5},
-    "dest din, step 0, h5, lr 0.001, gamma 0.99, nn128, 2000 iter": {"linestyle": "--", "linewidth": 1.5},
+    "tuning, dest din, step dijk30, h5, lr 0.00017, gamma 0.977, nn256-128-256, 4000 iter": {"linestyle": "--", "linewidth": 1.5},
+    "coo&lung, dest 1, step dijk30, h5, lr 0.001, gamma 0.99, nn256-128-256, 2000 iter": {"linestyle": "--", "linewidth": 1.5},
+    "coo&lung, dest din, step 0, h5, lr 0.001, gamma 0.99, nn256-128-256, 2000 iter": {"linestyle": "--", "linewidth": 1.5},
+    "coo&lung, dest din, step dijk30, h5, lr 0.001, gamma 0.99, nn256-128-256, 2000 iter": {"linestyle": "--", "linewidth": 1.5},
+
+    #"dest 1, step 0, h5, lr 0.001, gamma 0.99, nn128, 2000 iter": {"color": "black", "linestyle": "-", "linewidth": 2.5},
+    #"dest din, step 0, h5, lr 0.001, gamma 0.99, nn128, 2000 iter": {"linestyle": "--", "linewidth": 1.5},
 }
 
 # Metriche ed i titoli
