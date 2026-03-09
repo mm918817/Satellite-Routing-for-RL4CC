@@ -5,6 +5,7 @@ import numpy as np
 import json
 from RL4CC.environment.base_environment import BaseEnvironment
 from geopy.distance import geodesic
+import os
 
 class SatEnvironment(BaseEnvironment):
     def __init__(self, env_config: EnvContext):
@@ -24,20 +25,30 @@ class SatEnvironment(BaseEnvironment):
         Carica le configurazioni temporali ed i JSON con info satellitari.
         """
         super().load_configuration(env_config)
+        base_path = "/app"
 
+        # Funzione helper per gestire percorsi assoluti
+        def get_abs_path(filename):
+            if os.path.isabs(filename):
+                return filename
+            return os.path.join(base_path, filename)
+    
         self.is_evaluation = env_config.get("is_evaluation", False) # Flag se sono in evaluation
 
         if self.is_evaluation: # Se in eval, inizializza contatore sequenziale flussi
                 self.flow_index = 0
 
         # Caricamento file JSON dai file di config
-        with open(env_config["flows_file"], "r") as f:
+        flows_path = get_abs_path(env_config["flows_file"])
+        with open(flows_path, "r") as f:
             self.flows = json.load(f)
 
-        with open(env_config["topology_file"], "r") as f:
+        topo_path = get_abs_path(env_config["topology_file"])
+        with open(topo_path, "r") as f:
             self.topologies = json.load(f)
 
-        with open(env_config["flows_dijkstra"], "r") as f:  # json con dijkstra calcolato per ogni flusso in ogni topologia
+        dijkstra_path = get_abs_path(env_config["flows_dijkstra"])
+        with open(dijkstra_path, "r") as f:
             self.flows_dijkstra = json.load(f)
 
         # Lookup Dijkstra: (time, start_id, end_id) -> item
@@ -162,7 +173,7 @@ class SatEnvironment(BaseEnvironment):
             print(f"EVAL FLOW (Index {self.flow_index}):", self.current_flow)
         else:
             # Selezione flow RANDOM per il training
-            self.current_flow = np.random.choice(self.flows)
+            self.current_flow = self.np_random.choice(self.flows)
             print("TRAIN FLOW (Random):", self.current_flow)
 
         self.start_id = self.current_flow["start_id"]
@@ -331,8 +342,8 @@ class SatEnvironment(BaseEnvironment):
      # --- REWARD DESTINAZIONE ---
         if self.current_sat == self.end_id: # Se ho raggiunto la destinazione
             # Non tiene conto della divisione zero, ma i file flussi non possono avere stesso inizio e destinazione
-            #reward = (self.dijkstra_dist / self.dist_tot)*self.w_dest # Reward destinazione dinamico
-            reward = 1 # Reward destinazione fisso ad 1
+            reward = (self.dijkstra_dist / self.dist_tot)*self.w_dest # Reward destinazione dinamico
+            #reward = 1 # Reward destinazione fisso ad 1
             self.dest_reached = 1
             print("reward raggiunta destinazione", reward) # DEBUG reward            
             return reward
