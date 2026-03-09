@@ -1,0 +1,11 @@
+{
+  "num_tune_trials": 20,
+  "metric": "episode_reward_mean",
+  "mode": "max",
+  "search_algorithm": {
+      "hyperopt_search": {
+        "metric": "episode_reward_mean",
+        "mode": "max"
+      }
+    }
+}

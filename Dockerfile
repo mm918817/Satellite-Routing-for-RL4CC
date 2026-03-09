@@ -25,6 +25,7 @@ COPY main.py .
 COPY exp_config.json .
 COPY env_config.json .
 COPY ray_config.json .
+COPY tune_config.json .
 COPY src ./src
 COPY flows_src__dst_timeline.json .
 COPY flows_eval.json .

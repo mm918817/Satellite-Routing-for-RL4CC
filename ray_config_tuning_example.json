@@ -2,11 +2,11 @@
   "training": {
     "batch_size": 128,
     "num_train_batches": 2,
-    "lr": 0.00017,
-    "gamma": 0.977,
+    "lr": "tune.loguniform(1e-4, 5e-3)",
+    "gamma": "tune.uniform(0.90, 0.99)",
     "num_steps_sampled_before_learning_starts": 0,
     "model": {
-      "fcnet_hiddens": [256, 128, 256],
+      "fcnet_hiddens": "tune.choice([[64, 64], [128, 64], [128, 128], [256, 128], [256, 128, 256]])",
       "fcnet_activation": "relu"
     },
     "replay_buffer_config": {
