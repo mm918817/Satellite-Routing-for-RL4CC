@@ -1,18 +1,18 @@
 {
   "training": {
-    "batch_size": 64,
-    "num_train_batches": 4,
-    "lr": 0.0005,
+    "batch_size": 128,
+    "num_train_batches": 2,
+    "lr": 0.001,
     "gamma": 0.99,
     "exploration_config": {
         "type": "EpsilonGreedy",
         "initial_epsilon": 1.0,
         "final_epsilon": 0.05,
-        "epsilon_timesteps": 120000
+        "epsilon_timesteps": 240000 
     },
     "num_steps_sampled_before_learning_starts": 0,
     "model": {
-      "fcnet_hiddens": [64, 64],
+      "fcnet_hiddens": [128, 128],
       "fcnet_activation": "relu"
     },
     "replay_buffer_config": {
@@ -30,7 +30,7 @@
   },
   "rollouts": {
     "num_rollout_workers": 1,
-    "duration_per_worker": 1,
+    "duration_per_worker": 5,
     "duration_unit": "episodes"
   },
   "callbacks": {

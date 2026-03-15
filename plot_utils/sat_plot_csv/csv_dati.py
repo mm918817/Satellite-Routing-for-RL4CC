@@ -80,6 +80,11 @@ with open(output_file, 'w') as f:
         ep_count = len(lengths) # Numero di episodi per l'iterazione
         concluded = 0  # Contatore dei flussi conclusi
         optimal = 0 # Contatore se i flussi sono ottimali, cioè uguali a dijkstra 
+        err10 = 0 # Contatore se i flussi sono ottimali, cioè uguali a dijkstra entro un errore del 10%
+        err20 = 0 # Contatore se i flussi sono ottimali, cioè uguali a dijkstra entro un errore del 20%
+        err30 = 0 # Contatore se i flussi sono ottimali, cioè uguali a dijkstra entro un errore del 30%
+        err40 = 0 # Contatore se i flussi sono ottimali, cioè uguali a dijkstra entro un errore del 40%
+        err50 = 0 # Contatore se i flussi sono ottimali, cioè uguali a dijkstra entro un errore del 50%
         
         iteration_diffs = [] # Lista per salvare gli scostamenti(%) degli episodi andati a buon fine
 
@@ -101,15 +106,32 @@ with open(output_file, 'w') as f:
                     if dijk_val > 0:
                         diff_pct = max(0.0,((dist_val / dijk_val) - 1) * 100) # max per evitare -0.00% (per errori calcoli all'ultimo valore, per via dell'ultimo valore episodio)
                         iteration_diffs.append(diff_pct)
-                    
+                        if (diff_pct<11.0):
+                            err10 = err10 +1
+                        if (diff_pct<21.0):
+                            err20 = err20 +1
+                        if (diff_pct<31.0):
+                            err30 = err30 +1
+                        if (diff_pct<41.0):
+                            err40 = err40 +1
+                        if (diff_pct<51.0):
+                            err50 = err50 +1
+                 
                     if (abs(dist_val - dijk_val) < MAX_ERR):
                         optimal = optimal + 1
+            
             except IndexError:
                 pass
             current_idx_tmp += length
 
         pct_concluded = (concluded / ep_count * 100) if ep_count > 0 else 0 
         pct_optimal = (optimal / ep_count * 100) if ep_count > 0 else 0 
+        pct_err10 = (err10 / ep_count * 100) if ep_count > 0 else 0
+        pct_err20 = (err20 / ep_count * 100) if ep_count > 0 else 0
+        pct_err30 = (err30 / ep_count * 100) if ep_count > 0 else 0
+        pct_err40 = (err40 / ep_count * 100) if ep_count > 0 else 0
+        pct_err50 = (err50 / ep_count * 100) if ep_count > 0 else 0 
+        
         mean_diff_iter = np.mean(iteration_diffs) if iteration_diffs else 0.0 # % Media dello scostamento per l'intera iterazione
 
         # Salvataggio dati per summary.csv
@@ -117,6 +139,11 @@ with open(output_file, 'w') as f:
             "iteration": iterazione,
             "pct_concluded": pct_concluded,
             "pct_optimal": pct_optimal,
+            "pct_err10": pct_err10,
+            "pct_err20": pct_err20,
+            "pct_err30": pct_err30,    
+            "pct_err40": pct_err40,            
+            "pct_err50": pct_err50,            
             "mean_diff_iter": mean_diff_iter
         })
 
@@ -128,6 +155,7 @@ with open(output_file, 'w') as f:
             f"ITER {iterazione}:  "
             f"Concluded flows: {pct_concluded:6.2f}% | "
             f"Optimal route: {pct_optimal:6.2f}% | "
+            f"Ptc Err: {pct_err10:6.2f}%,{pct_err20:6.2f}%,{pct_err30:6.2f}%,{pct_err40:6.2f}%,{pct_err50:6.2f}% | "
             f"Avg Deviat from Dijk: {mean_diff_iter:6.2f}% | "
             f"EP count: {ep_count}\n"
         )

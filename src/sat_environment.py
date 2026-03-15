@@ -8,9 +8,21 @@ from geopy.distance import geodesic
 import os
 
 class SatEnvironment(BaseEnvironment):
-    def __init__(self, env_config: EnvContext):
 
-            # Carico tutta la configurazione(gestione)
+    # Variabili statiche per dati comuni
+    _flows = None
+    _topologies = None
+    _flows_dijkstra = None
+    _dijkstra_by_key = None
+    _topo_by_time = None
+
+    def __init__(self, env_config: EnvContext):
+            
+            # Carica dati una sola volta all'inizio
+            if SatEnvironment._flows is None:
+                self._load_static_data(env_config)
+
+            # Carica tutta la configurazione(gestione)
             seed = self.load_configuration(env_config)
 
             # Ridefinizione spazi sovrascrivendo quelli base_environment
@@ -19,46 +31,50 @@ class SatEnvironment(BaseEnvironment):
 
             self.reset(seed=seed)
 
+    def _load_static_data(self, env_config):
+        """
+        Carica i file JSON solo la prima volta che un worker viene creato.
+        """
+        base_path = "/app"
+        # Funzione helper per gestire percorsi assoluti
+        def get_abs_path(filename):
+            if os.path.isabs(filename):
+                return filename
+            return os.path.join(base_path, filename)
+        
+        # Caricamento file JSON dai file di config
+        with open(get_abs_path(env_config["flows_file"]), "r") as f:
+            SatEnvironment._flows = json.load(f)
+
+        with open(get_abs_path(env_config["topology_file"]), "r") as f:
+            SatEnvironment._topologies = json.load(f)
+
+        with open(get_abs_path(env_config["flows_dijkstra"]), "r") as f:
+            SatEnvironment._flows_dijkstra = json.load(f)
+
+        # Lookup Dijkstra: (time, start_id, end_id) -> item
+        SatEnvironment._dijkstra_by_key = {
+            (item["time"], item["start_id"], item["end_id"]): item
+            for item in SatEnvironment._flows_dijkstra
+        }
+
+        # Lookup topologie: (time) -> topologia associata
+        SatEnvironment._topo_by_time = {t["time"]: t for t in SatEnvironment._topologies}
+
+
     def load_configuration(self, env_config):
         """
         Estende il load del BaseEnvironment di RL4CC.
         Carica le configurazioni temporali ed i JSON con info satellitari.
         """
         super().load_configuration(env_config)
-        base_path = "/app"
 
-        # Funzione helper per gestire percorsi assoluti
-        def get_abs_path(filename):
-            if os.path.isabs(filename):
-                return filename
-            return os.path.join(base_path, filename)
-    
+
         self.is_evaluation = env_config.get("is_evaluation", False) # Flag se sono in evaluation
 
         if self.is_evaluation: # Se in eval, inizializza contatore sequenziale flussi
                 self.flow_index = 0
 
-        # Caricamento file JSON dai file di config
-        flows_path = get_abs_path(env_config["flows_file"])
-        with open(flows_path, "r") as f:
-            self.flows = json.load(f)
-
-        topo_path = get_abs_path(env_config["topology_file"])
-        with open(topo_path, "r") as f:
-            self.topologies = json.load(f)
-
-        dijkstra_path = get_abs_path(env_config["flows_dijkstra"])
-        with open(dijkstra_path, "r") as f:
-            self.flows_dijkstra = json.load(f)
-
-        # Lookup Dijkstra: (time, start_id, end_id) -> item
-        self.dijkstra_by_key = {
-            (item["time"], item["start_id"], item["end_id"]): item
-            for item in self.flows_dijkstra
-        }
-
-        # Lookup topologie: (time) -> topologia associata
-        self.topo_by_time = {t["time"]: t for t in self.topologies}
 
         # Peso per regolare reward step intermedio
         self.w_step = env_config["step_weight"]
@@ -168,12 +184,12 @@ class SatEnvironment(BaseEnvironment):
 
         if self.is_evaluation:
             # Selezione flow SEQUENZIALE per la valutazione
-            self.current_flow = self.flows[self.flow_index]        
-            self.flow_index = (self.flow_index + 1) % len(self.flows)
+            self.current_flow = SatEnvironment._flows[self.flow_index]        
+            self.flow_index = (self.flow_index + 1) % len(SatEnvironment._flows)
             print(f"EVAL FLOW (Index {self.flow_index}):", self.current_flow)
         else:
             # Selezione flow RANDOM per il training
-            self.current_flow = self.np_random.choice(self.flows)
+            self.current_flow = self.np_random.choice(SatEnvironment._flows)
             print("TRAIN FLOW (Random):", self.current_flow)
 
         self.start_id = self.current_flow["start_id"]
@@ -183,7 +199,7 @@ class SatEnvironment(BaseEnvironment):
 
         # Recupero dijkstra per il flusso selezionato
         key = (flow_time, self.start_id, self.end_id)
-        dijkstra_entry = self.dijkstra_by_key.get(key)
+        dijkstra_entry = SatEnvironment._dijkstra_by_key.get(key)
         if dijkstra_entry is None:
             raise ValueError(f"Nessun risultato Dijkstra per {key}")
         self.dijkstra_dist = dijkstra_entry["distance_km"] # Distanza dijkstra da inizio a fine flusso
@@ -192,7 +208,7 @@ class SatEnvironment(BaseEnvironment):
 
 
         # Topologia associata al time
-        self.topology = self.topo_by_time[flow_time]
+        self.topology = SatEnvironment._topo_by_time[flow_time]
 
         # Lookup per i satelliti dell'attuale topologia: (id) -> satellite
         self.sat_by_id = {
@@ -342,8 +358,8 @@ class SatEnvironment(BaseEnvironment):
      # --- REWARD DESTINAZIONE ---
         if self.current_sat == self.end_id: # Se ho raggiunto la destinazione
             # Non tiene conto della divisione zero, ma i file flussi non possono avere stesso inizio e destinazione
-            reward = (self.dijkstra_dist / self.dist_tot)*self.w_dest # Reward destinazione dinamico
-            #reward = 1 # Reward destinazione fisso ad 1
+            #reward = (self.dijkstra_dist / self.dist_tot)*self.w_dest # Reward destinazione dinamico
+            reward = 1 # Reward destinazione fisso ad 1
             self.dest_reached = 1
             print("reward raggiunta destinazione", reward) # DEBUG reward            
             return reward
