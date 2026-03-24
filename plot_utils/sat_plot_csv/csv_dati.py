@@ -68,7 +68,7 @@ with open(output_file, 'w') as f:
         iterazione = idx + 1
         
         # Valori come rewards (o anche distances) sono salvati uno dopo l'altro(per step), nella stessa lista, per episodi diversi
-        # Quindi per ogni episodio si usano come delle "window" per recuperare gli tutti elementi che lo compongono
+        # Quindi per ogni episodio si usano come delle "window" per recuperare tutti gli  elementi che lo compongono
         lengths = row['hist_stats/episode_lengths'] # Lista con lunghezza di ogni episodio
         rewards = row['hist_stats/step_reward']
         holes = row['hist_stats/hole_counter']
@@ -80,19 +80,19 @@ with open(output_file, 'w') as f:
         ep_count = len(lengths) # Numero di episodi per l'iterazione
         concluded = 0  # Contatore dei flussi conclusi
         optimal = 0 # Contatore se i flussi sono ottimali, cioè uguali a dijkstra 
-        err10 = 0 # Contatore se i flussi sono ottimali, cioè uguali a dijkstra entro un errore del 10%
-        err20 = 0 # Contatore se i flussi sono ottimali, cioè uguali a dijkstra entro un errore del 20%
-        err30 = 0 # Contatore se i flussi sono ottimali, cioè uguali a dijkstra entro un errore del 30%
-        err40 = 0 # Contatore se i flussi sono ottimali, cioè uguali a dijkstra entro un errore del 40%
-        err50 = 0 # Contatore se i flussi sono ottimali, cioè uguali a dijkstra entro un errore del 50%
-        
+        err10 = err20 = err30 = err40 = err50 = 0 # Contatori se i flussi sono ottimali, cioè uguali a dijkstra entro una % di errore
+
         iteration_diffs = [] # Lista per salvare gli scostamenti(%) degli episodi andati a buon fine
+        episodes_diffs = {} # Dict per scostamenti sulle colonne singole del csv
 
         # -- Calcola statistiche aggregate per % di: flussi conclusi, ottimali, scostamento di dijkstra --
         current_idx_tmp = 0 # Puntatore ad un range(window) di elementi per un episodio
-        for length in lengths:
+        for ep_i, length in enumerate(lengths):
             first_idx = current_idx_tmp
             last_idx = current_idx_tmp + length - 1
+
+            diff_to_save = "-" # Valore di default "-" per flusso NON concluso (quindi non ho scostamento da dijkstra)
+
             try:
                 d_ok = dest_reached[last_idx] # L'elemento all'ultima posizione di di dest_reached mi dice se sono arrivato a destinazione(1) o no(0)
 
@@ -104,38 +104,38 @@ with open(output_file, 'w') as f:
                     
                     # Calcolo scostamento: ((Dist / Dijk) - 1) * 100
                     if dijk_val > 0:
-                        diff_pct = max(0.0,((dist_val / dijk_val) - 1) * 100) # max per evitare -0.00% (per errori calcoli all'ultimo valore, per via dell'ultimo valore episodio)
+                        diff_pct = round(max(0.0,((dist_val / dijk_val) - 1) * 100), 2) # max per evitare -0.00% (per errori calcoli all'ultimo valore, per via dell'ultimo valore episodio)
                         iteration_diffs.append(diff_pct)
-                        if (diff_pct<11.0):
-                            err10 = err10 +1
-                        if (diff_pct<21.0):
-                            err20 = err20 +1
-                        if (diff_pct<31.0):
-                            err30 = err30 +1
-                        if (diff_pct<41.0):
-                            err40 = err40 +1
-                        if (diff_pct<51.0):
-                            err50 = err50 +1
+                        diff_to_save = diff_pct # Valore numerico dell'episodio per il CSV
+                        
+                        if diff_pct < 11.0: err10 += 1
+                        if diff_pct < 21.0: err20 += 1
+                        if diff_pct < 31.0: err30 += 1
+                        if diff_pct < 41.0: err40 += 1
+                        if diff_pct < 51.0: err50 += 1
                  
                     if (abs(dist_val - dijk_val) < MAX_ERR):
-                        optimal = optimal + 1
-            
+                        optimal += 1            
             except IndexError:
                 pass
+            # Scostamento del singolo episodio (numero o "-")
+            episodes_diffs[f"ep{ep_i+1}_diff"] = diff_to_save 
             current_idx_tmp += length
 
+        # Metriche aggregate
         pct_concluded = (concluded / ep_count * 100) if ep_count > 0 else 0 
         pct_optimal = (optimal / ep_count * 100) if ep_count > 0 else 0 
+
         pct_err10 = (err10 / ep_count * 100) if ep_count > 0 else 0
         pct_err20 = (err20 / ep_count * 100) if ep_count > 0 else 0
         pct_err30 = (err30 / ep_count * 100) if ep_count > 0 else 0
         pct_err40 = (err40 / ep_count * 100) if ep_count > 0 else 0
         pct_err50 = (err50 / ep_count * 100) if ep_count > 0 else 0 
         
-        mean_diff_iter = np.mean(iteration_diffs) if iteration_diffs else 0.0 # % Media dello scostamento per l'intera iterazione
+        mean_diff_iter = round(np.mean(iteration_diffs), 2) if iteration_diffs else 0.0 # % Media dello scostamento per l'intera iterazione
 
-        # Salvataggio dati per summary.csv
-        summary_data.append({
+        # Salvataggio dati riga titoletto iterazione per summary.csv
+        row_summary = {
             "iteration": iterazione,
             "pct_concluded": pct_concluded,
             "pct_optimal": pct_optimal,
@@ -145,7 +145,10 @@ with open(output_file, 'w') as f:
             "pct_err40": pct_err40,            
             "pct_err50": pct_err50,            
             "mean_diff_iter": mean_diff_iter
-        })
+        }
+        
+        row_summary.update(episodes_diffs) # Unione delle colonne degli ep individuali
+        summary_data.append(row_summary)
 
         if iterazione > 1:
             f.write(iter_separator)
@@ -209,6 +212,16 @@ with open(output_file, 'w') as f:
 
 # --- SALVATAGGIO summary.csv ---
 summary_df = pd.DataFrame(summary_data)
+
+# Riordina le colonne per avere scostamento degli ep in ordine (prima aggregate, poi episodi ordinati)
+cols = [c for c in summary_df.columns if not c.startswith('ep')] + \
+       sorted([c for c in summary_df.columns if c.startswith('ep')], key=lambda x: int(x.split('_')[0][2:]))
+
+summary_df = summary_df[cols]
+
+# Riempie i valori mancanti (se alcune iterazioni hanno meno episodi) con "-"
+summary_df = summary_df.fillna("-")
+
 summary_df.to_csv(summary_csv, index=False)
 
 print(f"Processo completato.")
