@@ -10,23 +10,28 @@ os.makedirs(output_folder, exist_ok=True)
 
 X_SCALE = 5 # Evaluation ogni 5 iterazioni, nel summary.csv sono salvate ogni 1
 WINDOW_SIZE = 10  # Media mobile su 10 punti (50 iterazioni reali se X_SCALE=5)
-WINDOW_SIZE_OPT = 5 # Media mobile per rotta ottimale e con errori per poter calcolare: media, min e max su questo range di iterazioni
+WINDOW_SIZE_OPT = 50 # Media mobile per rotta ottimale e con errori per poter calcolare: media, min e max su questo range di iterazioni
 
-# Parametri per la penalità (Per scostamento rispetto a dijktra) 
-MAX_PENALTY = 1450 # Valore assegnato ad ogni flusso NON concluso (eg: 350%, usare il massimo tra i vari summary, o provare prima con 0 e vedere il valore massimo che esce)
+# Parametri per la penalità (Per grafico scostamento rispetto a dijktra) 
+MAX_PENALTY = 1500 # Valore assegnato ad ogni flusso NON concluso (eg: 350%, usare il massimo tra i vari summary, mettere a 0 con anche WINDOW_SIZE ad 1 e vedere il valore massimo che esce)
 TOT_FLOWS = 10 # Numero di flussi per ogni valutazione
 
 # File summary.csv da includere
 files_to_plot = [
 
-    "summary_iterations"
+    "old_Best",
+    "A1 - n_step 1, 2k iter, 120k eps",
+    "A2"
+
+
+
 
 ]
 
 # Stile linee (se non specificato usa il default di Matplotlib)
 file_styles = {
 
-    #"dest 1, step 0, h5, lr 0.001, gamma 0.99, nn128, 2000 iter": {"color": "black", "linestyle": "-", "linewidth": 2.5},
+    "old_Best": {"color": "black", "linestyle": "--", "linewidth": 1},
     #"dest din, step 0, h5, lr 0.001, gamma 0.99, nn128, 2000 iter": {"linestyle": "--", "linewidth": 1.5},
 }
 
@@ -55,7 +60,7 @@ else:
             if os.path.exists(file_path):
                 df = pd.read_csv(file_path).copy() # Fa una copia non modifica gli originali
                 
-                # Lista con nomi delle colonne dei singoli episodi e sostistuisce i "-" con la penalità per poter fare calcoli
+                # Lista con nomi delle colonne dello scostamento dei singoli episodi da dijkstra e sostistuisce i "-" con la penalità per poter fare calcoli
                 ep_cols = [c for c in df.columns if c.startswith('ep')]
                 if ep_cols:
                     for col in ep_cols:
@@ -92,12 +97,13 @@ else:
                     plt.fill_between(x_values, y_min_window, y_max_window, color=line.get_color(), alpha=0.1)
                     plt.title(f"Confronto (Media Mobile {WINDOW_SIZE_OPT} punti): {ylabel}")
 
-                # --- CASE 2: Scostamento da Dijkstra (Media, Min/Max e Std Dev)
+                # --- CASE 2: Scostamento da Dijkstra (Media, Min/Max e Std Dev rispetto a un'iterazione, cioè riga del csv)
+                # Poi viene comunque fatta una meida rispetto alla finestra specificata per rendere più leggibile
                 elif column == "mean_diff_iter":
                     y_smooth = df[column].rolling(window=WINDOW_SIZE, min_periods=1).mean()
                     line, = plt.plot(x_values, y_smooth, label=file_name, **custom_args)
                     
-                    if ep_cols: # Per gestire csv vecchi dove non ci sono le colonne ep_cols
+                    if ep_cols: # if Per gestire csv vecchi dove non ci sono le colonne ep_cols
                         row_std = df[ep_cols].std(axis=1) # Serie dove ogni elemento è Std dev tra gli ep della riga nel csv
                         row_min = df[ep_cols].min(axis=1) # Serie dove ogni elemento è il valore min tra gli ep della riga nel csv
                         row_max = df[ep_cols].max(axis=1) # Serie dove ogni elemento è ilvalore max tra gli ep della riga nel csv
@@ -109,9 +115,9 @@ else:
                         
                         # Per area deviazione standard
                         plt.fill_between(x_values, 
-                                        (y_smooth - std_smooth), # (media - std_dev) per avere estremo inferiore
-                                        (y_smooth + std_smooth),               # (media + std_dev) per avere estremo superiore
-                                        color=line.get_color(), alpha=0.25, label=f"Std Dev {file_name}") # Etichetta  label=f"Std Dev {file_name}"
+                                        (y_smooth - std_smooth).clip(lower=0), # (media - std_dev) per avere estremo inferiore
+                                        (y_smooth + std_smooth).clip(upper=y_max_smooth), # (media + std_dev) per avere estremo superiore
+                                        color=line.get_color(), alpha=0.25) # Etichetta  label=f"Std Dev {file_name}"
                         
                         # Per estremi Min/Max
                         plt.plot(x_values, y_max_smooth, color=line.get_color(), 
@@ -119,11 +125,11 @@ else:
                         plt.plot(x_values, y_min_smooth, color=line.get_color(), 
                                 linestyle='--', linewidth=0.8, alpha=0.5)
                         
-                        # Per are tra i minimi e i massimi
+                        # Per area tra i minimi e i massimi
                         plt.fill_between(x_values, y_min_smooth.clip(lower=0), y_max_smooth, 
                                         color=line.get_color(), alpha=0.05)
                         plt.title(f"Confronto (Media Mobile {WINDOW_SIZE} punti): {ylabel}")
-                # --- CASE 3: Flussi conclusi (Media)
+                # --- CASE 3: Flussi conclusi (Media rispetto alla finestra specificata)
                 else:
                     y_smooth = df[column].rolling(window=WINDOW_SIZE, min_periods=1).mean()
                     plt.plot(x_values, y_smooth, label=file_name, **custom_args)
@@ -132,6 +138,8 @@ else:
         
         if column == "mean_diff_iter":
             plt.axhline(y=25, color='gold', linestyle='--', linewidth=1, label='Soglia  25%')
+            plt.axhline(y=50, color='gold', linestyle='--', linewidth=1)
+
 
         plt.xlabel("Iterazioni")
         plt.ylabel(ylabel)
