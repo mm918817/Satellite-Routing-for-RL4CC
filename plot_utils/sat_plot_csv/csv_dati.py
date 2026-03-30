@@ -60,6 +60,8 @@ summary_data = [] # Lista dati che andranno nel summary (csv)
 # - Scrittura del file -
 with open(output_file, 'w') as f:
     f.write(f"REPORT - Episodi per ogni iterazione (MAX STEP CAP: {MAX_STEPS_CAP})\n")
+    f.write("ATTENZIONE! I valori di \"Avg Deviat from Dijk\" in questo txt e della colonna \"mean_diff_iter\" nel summary.csv\n")
+    f.write("Sono rispetto ai flussi conclusi, vengono aggiustati nei plot delle percentuali con una penalizzazione specificata\n")
     f.write(separator)
     f.write(header)
     f.write(separator)
@@ -132,7 +134,7 @@ with open(output_file, 'w') as f:
         pct_err40 = (err40 / ep_count * 100) if ep_count > 0 else 0
         pct_err50 = (err50 / ep_count * 100) if ep_count > 0 else 0 
         
-        mean_diff_iter = round(np.mean(iteration_diffs), 2) if iteration_diffs else 0.0 # % Media dello scostamento per l'intera iterazione
+        mean_diff_iter = round(np.mean(iteration_diffs), 2) if iteration_diffs else 0.0 # % Media dello scostamento per l'intera iterazione (rispetto ai flussi conclusi)
 
         # Salvataggio dati riga titoletto iterazione per summary.csv
         row_summary = {

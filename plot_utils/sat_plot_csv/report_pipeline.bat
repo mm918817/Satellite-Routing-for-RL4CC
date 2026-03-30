@@ -3,14 +3,13 @@ setlocal enabledelayedexpansion
 
 :: --- CONFIGURAZIONE PERCORSI ---
 :: Percorso della cartella con i file originali
-set "TARGET_DIR=C:\Users\teo\Desktop\ATesi\prova RL\results\DQN_SatEnvironment_2026-03-15_07-12-556_2iouj2 - dest 1, step dijk30, h5, lr 0.0001, gamma 0.99, nn64, batchsz 64-4 eps 120000, 10k iter, rbuffer size 1500"
+set "TARGET_DIR=C:\Users\teo\Desktop\ATesi\prova RL\results\DQN_SatEnvironment_2026-03-30_09-47-39o4_xrvz1"
 :: Lo script assume di trovarsi nella stessa cartella dei file .py (A)json_to_csv, (B)csv_filter, (C)csv_dati
 set "SCRIPT_DIR=%~dp0"
 cd /d "%SCRIPT_DIR%"
 
-echo =================================================
-echo            PIPELINE GENERAZIONE REPORT
-echo =================================================
+
+echo ===    PIPELINE GENERAZIONE REPORT    ===
 echo.
 
 :: --- SCELTA MODALITÀ ---
@@ -68,7 +67,7 @@ del /q "progress.csv" 2>nul
 del /q "estratto_progress.csv" 2>nul
 
 echo.
-echo =================================================
-echo        OPERAZIONE COMPLETATA CON SUCCESSO
-echo =================================================
+
+echo ===    OPERAZIONE COMPLETATA    ===
+
 pause
