@@ -17,15 +17,17 @@ if data:
     # Conta le frequenze (quanti path hanno lunghezza 2, quanti 3, ecc.)
     distribution = Counter(lengths)
     
+    total_flows = len(data) # Numero totale dei flussi nel file dijkstra
+
     # Ordina i dati in base alla lunghezza del path)
     sorted_lengths = sorted(distribution.items())
     x_values = [item[0] for item in sorted_lengths]  # Lunghezza del path
-    y_values = [item[1] for item in sorted_lengths]  # Frequenza (quanti elementi)
+    y_values = [(item[1] / total_flows) * 100 for item in sorted_lengths]  # Frequenza (quanti elementi)
 
-    # Stampa i risultati testuali a terminale
-    print("Distribuzione lunghezze path:")
-    for length, count in sorted_lengths:
-        print(f"Lunghezza {length}: {count} elementi")
+    # Stampa i risultati a terminale
+    print("Distribuzione lunghezze path (%):")
+    for length, percentage in zip(x_values, y_values):
+        print(f"Lunghezza {length}: {percentage:.2f}%")
 
     # Creazione del grafico
     plt.figure(figsize=(10, 6))
@@ -34,11 +36,11 @@ if data:
     # Aggiunge le etichette sopra ogni barra
     for bar in bars:
         yval = bar.get_height()
-        plt.text(bar.get_x() + bar.get_width()/2, yval + 0.1, yval, ha='center', va='bottom')
+        plt.text(bar.get_x() + bar.get_width()/2, yval + 0.2, f"{yval:.2f}%", ha='center', va='bottom')
 
     plt.xlabel('Numero di elementi nel Path (Nodi)')
-    plt.ylabel('Frequenza (Conteggio)')
-    plt.title('Distribuzione della lunghezza dei percorsi')
+    plt.ylabel('Percentuale frequenza (%)')
+    plt.title(f'Distribuzione della lunghezza su {total_flows} percorsi')
     plt.xticks(x_values) # Mostra tutti i valori interi sulla X
     plt.grid(axis='y', linestyle='--', alpha=0.7)
 
