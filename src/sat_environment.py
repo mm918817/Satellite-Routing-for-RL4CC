@@ -75,6 +75,7 @@ class SatEnvironment(BaseEnvironment):
         if self.is_evaluation: # Se in eval, inizializza contatore sequenziale flussi
                 self.flow_index = 0
 
+        self.phase_changed = False # Flag per il cambio reward
 
         # Peso per regolare reward step intermedio
         self.w_step = env_config["step_weight"]
@@ -182,6 +183,24 @@ class SatEnvironment(BaseEnvironment):
         
         super().reset(seed=seed)
 
+        counter_path = "/app/eval_counter.txt" # File che fa da contatore per il numero di iterazioni
+
+        # All'inizio del ciclo evaluation scrive nel file contatore delle iterazioni
+        if self.is_evaluation and self.flow_index == 0:
+            with open(counter_path, "a") as f:
+                f.write("1")
+
+        # Controlla in che iterazione siamo
+        if os.path.exists(counter_path):
+            with open(counter_path, "r") as f:
+                content = f.read()
+                eval_count = content.count("1")
+            
+            current_iter = eval_count * 5 # L'evaluation avviene ogni 5 iterazioni, "evaluation_interval" in exp_config
+            print(f"CURRENT ITER - - - {current_iter})")
+            if current_iter >= 750: # Iterazione target per cambio reward (es. 750)
+                self.phase_changed = True
+        
         if self.is_evaluation:
             # Selezione flow SEQUENZIALE per la valutazione
             self.current_flow = SatEnvironment._flows[self.flow_index]        
@@ -358,9 +377,16 @@ class SatEnvironment(BaseEnvironment):
      # --- REWARD DESTINAZIONE ---
         if self.current_sat == self.end_id: # Se ho raggiunto la destinazione
             # Non tiene conto della divisione zero, ma i file flussi non possono avere stesso inizio e destinazione
-            #reward = (self.dijkstra_dist / self.dist_tot)*self.w_dest # Reward destinazione dinamico
-            reward = 1 # Reward destinazione fisso ad 1
+            
             self.dest_reached = 1
+
+            if self.phase_changed:
+                reward = (self.dijkstra_dist / self.dist_tot)*self.w_dest # Reward destinazione dinamico
+                print(f"DEBUG: Reward DEST DINAMICO: {reward}")
+            else:    
+                reward = 1 # Reward destinazione fisso ad 1
+                print(f"DEBUG: Reward DEST FISSO: {reward}")
+            
             print("reward raggiunta destinazione", reward) # DEBUG reward            
             return reward
 
