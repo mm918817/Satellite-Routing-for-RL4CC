@@ -6,10 +6,11 @@ import os
 # ----- Script che prende il file csv filtrato e costruire una tabella con varie metriche per ogni episodio -----
 
 # REPORT - Episodi per ogni iterazione (MAX STEP CAP: N)
-# ------------------------------------------------------------------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------------------------------------------------------------------------------------
 # ITER   | EP  | HOLES | DISTANCE   | DIJK_DIST  | DIFF_%   | DEST_OK | STP/30  | DIJK_HOP | LAST_R     | RETURN     | MIN_R    | MAX_R    | MEAN_R   | STD_R   
-# ------------------------------------------------------------------------------------------------------------------------------------------------------
-# ITER N:  Concluded flows:  % | Optimal route:  % | Avg Deviat from Dijk:  % | EP count: N
+# ------------------------------------------------------------------------------------------------------------------------------------------------------------
+# ITER N:  Concluded flows:  % | Optimal route:  % | Ptc Err:  %, %, %, %, % | Avg Deviat from Dijk:  % | Reward (Mean/Min/Max): #/#/# | EP count: N
+
 
 base_path = os.path.dirname(os.path.abspath(__file__))
 file_path = os.path.join(base_path, 'estratto_progress.csv')
@@ -36,6 +37,7 @@ cols_to_parse = [
     'hist_stats/dijkstra_dist',
     'hist_stats/dijkstra_hop',
     'hist_stats/dest_reached',
+    'hist_stats/episode_reward',
 
 ]
 
@@ -69,15 +71,16 @@ with open(output_file, 'w') as f:
     for idx, row in df.iterrows(): # Itera sulle righe del csv, ogni riga è un'iterazione (un'insieme di episodi)
         iterazione = idx + 1
         
-        # Valori come rewards (o anche distances) sono salvati uno dopo l'altro(per step), nella stessa lista, per episodi diversi
+        # Valori come step_rewards (o anche distances) sono salvati uno dopo l'altro(per step), nella stessa lista, per episodi diversi
         # Quindi per ogni episodio si usano come delle "window" per recuperare tutti gli  elementi che lo compongono
         lengths = row['hist_stats/episode_lengths'] # Lista con lunghezza di ogni episodio
-        rewards = row['hist_stats/step_reward']
+        step_rewards = row['hist_stats/step_reward']
         holes = row['hist_stats/hole_counter']
         distances = row['hist_stats/total_distance']
         dijkstra = row['hist_stats/dijkstra_dist']
         dijkstra_hop = row['hist_stats/dijkstra_hop']
         dest_reached = row['hist_stats/dest_reached']
+        ep_rewards = row['hist_stats/episode_reward']
 
         ep_count = len(lengths) # Numero di episodi per l'iterazione
         concluded = 0  # Contatore dei flussi conclusi
@@ -124,6 +127,14 @@ with open(output_file, 'w') as f:
             episodes_diffs[f"ep{ep_i+1}_diff"] = diff_to_save 
             current_idx_tmp += length
 
+        # Calcolo del reward medio, minimo e massimo per iterazione
+        if ep_rewards:
+            mean_rw_iter = round(np.mean(ep_rewards), 4)
+            min_rw_iter = round(np.min(ep_rewards), 4)
+            max_rw_iter = round(np.max(ep_rewards), 4)
+        else:
+            mean_rw_iter = min_rw_iter = max_rw_iter = 0.0 
+
         # Metriche aggregate
         pct_concluded = (concluded / ep_count * 100) if ep_count > 0 else 0 
         pct_optimal = (optimal / ep_count * 100) if ep_count > 0 else 0 
@@ -146,7 +157,10 @@ with open(output_file, 'w') as f:
             "pct_err30": pct_err30,    
             "pct_err40": pct_err40,            
             "pct_err50": pct_err50,            
-            "mean_diff_iter": mean_diff_iter
+            "mean_diff_iter": mean_diff_iter,
+            "mean_reward_iter": mean_rw_iter,
+            "min_reward_iter": min_rw_iter,
+            "max_reward_iter": max_rw_iter,
         }
         
         row_summary.update(episodes_diffs) # Unione delle colonne degli ep individuali
@@ -161,7 +175,8 @@ with open(output_file, 'w') as f:
             f"Concluded flows: {pct_concluded:6.2f}% | "
             f"Optimal route: {pct_optimal:6.2f}% | "
             f"Ptc Err: {pct_err10:6.2f}%,{pct_err20:6.2f}%,{pct_err30:6.2f}%,{pct_err40:6.2f}%,{pct_err50:6.2f}% | "
-            f"Avg Deviat from Dijk: {mean_diff_iter:6.2f}% | "
+            f"Avg Deviat from Dijk: {mean_diff_iter:6.2f}% |\n"
+            f"Reward (Mean/Min/Max): {mean_rw_iter}/{min_rw_iter}/{max_rw_iter} | "
             f"EP count: {ep_count}\n"
         )
 
@@ -171,7 +186,7 @@ with open(output_file, 'w') as f:
         # -- Seconda passata per statistiche individuali per episodio --
         current_idx = 0
         for ep_num, length in enumerate(lengths):
-            ep_rewards = rewards[current_idx : current_idx + length]
+            ep_rewards = step_rewards[current_idx : current_idx + length]
             ep_return = np.sum(ep_rewards) if ep_rewards else 0.0
             first_val_idx = current_idx
             last_val_idx = current_idx + length - 1
@@ -182,7 +197,7 @@ with open(output_file, 'w') as f:
                 ep_dijkstra = dijkstra[first_val_idx] 
                 ep_dijkstra_hop = dijkstra_hop[first_val_idx]      
                 ep_dest = int(dest_reached[last_val_idx]) # Convertito in int per la tabella
-                last_step_reward = rewards[last_val_idx]
+                last_step_reward = step_rewards[last_val_idx]
                 
                 # Calcolo percentuale per la riga
                 if ep_dest == 1 and ep_dijkstra > 0:

@@ -58,8 +58,6 @@ class SatelliteNetwork:
         # Filtra i flussi per time
         flows_at_time = [f for f in self.flows if f["time"] == flow_time]
 
-        flows_at_time = [f for f in self.flows if f["time"] == flow_time]
-
         results = []
         for flow in flows_at_time:
             start = flow["start_id"]
