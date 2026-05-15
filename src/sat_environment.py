@@ -7,6 +7,9 @@ from RL4CC.environment.base_environment import BaseEnvironment
 from geopy.distance import geodesic
 import os
 
+import networkx as nx
+
+
 class SatEnvironment(BaseEnvironment):
 
     # Variabili statiche per dati comuni
@@ -15,6 +18,7 @@ class SatEnvironment(BaseEnvironment):
     _flows_dijkstra = None
     _dijkstra_by_key = None
     _topo_by_time = None
+    _seed = 0
 
     def __init__(self, env_config: EnvContext):
             
@@ -75,7 +79,8 @@ class SatEnvironment(BaseEnvironment):
         if self.is_evaluation: # Se in eval, inizializza contatore sequenziale flussi
                 self.flow_index = 0
 
-        self.phase_changed = False # Flag per il cambio reward
+        self.phase_changed = False # Flag per il cambio reward (curriculum learning), viene cambiato al raggiungimento della soglia
+        self.imit_learning = False # Flag per reward step come dijkstra (imitation learning), cambiare manualmente
 
         # Peso per regolare reward step intermedio
         self.w_step = env_config["step_weight"]
@@ -84,9 +89,11 @@ class SatEnvironment(BaseEnvironment):
         # Peso per regolare reward raggiunta la destinazione
         self.w_dest = env_config["dest_weight"]
         print("parametro reward raggiunta destinazione è", self.w_dest)
-        
 
-        return None  # seed, nel base_environment questa funzione restituisce un seed da passare al reset
+        SatEnvironment._seed = env_config.get("seed", None)
+        print("SEED impostato:", SatEnvironment._seed)
+
+        return SatEnvironment._seed  # seed, nel base_environment questa funzione restituisce un seed da passare al reset
 
 
     def define_observation_space(self):
@@ -182,13 +189,15 @@ class SatEnvironment(BaseEnvironment):
 
         
         super().reset(seed=seed)
+        print(f"seed in reset:",seed)
 
         counter_path = "/app/eval_counter.txt" # File che fa da contatore per il numero di iterazioni
-
+    
         # All'inizio del ciclo evaluation scrive nel file contatore delle iterazioni
         if self.is_evaluation and self.flow_index == 0:
             with open(counter_path, "a") as f:
                 f.write("1")
+                print(f"ooo write 1 ooo")        
 
         # Controlla in che iterazione siamo
         if os.path.exists(counter_path):
@@ -198,8 +207,11 @@ class SatEnvironment(BaseEnvironment):
             
             current_iter = eval_count * 5 # L'evaluation avviene ogni 5 iterazioni, "evaluation_interval" in exp_config
             print(f"CURRENT ITER - - - {current_iter})")
+
             if current_iter >= 750: # Iterazione target per cambio reward (es. 750)
                 self.phase_changed = True
+            if current_iter >=3000:
+                self.imit_learning = True
         
         if self.is_evaluation:
             # Selezione flow SEQUENZIALE per la valutazione
@@ -241,6 +253,13 @@ class SatEnvironment(BaseEnvironment):
         }
 
         self.current_sat = self.start_id
+
+        # Grafo per Imitation learning con dijkstra
+        self.G = self._build_graph() # Funzione helper per creare grafo satelliti
+        self.optimal_path = nx.dijkstra_path(self.G, self.start_id, self.end_id, weight='weight')
+        #for el in self.optimal_path: # DEBUG percorso dijkstra
+        #    print("Primo path ottimale: ")
+        #    print(f"sat:{el} ")
 
         self.cur_lat = self.sat_by_id[self.current_sat]["lat"]
         self.cur_lon = self.sat_by_id[self.current_sat]["lon"]
@@ -353,7 +372,7 @@ class SatEnvironment(BaseEnvironment):
             print(" ooo episodio completato con successo ooo")
         if truncated and not terminated:
             print(" ooo Timeout ooo")
-            reward = -1
+            reward = -1.0
             self.last_reward = reward
 
         obs, info = self.observation()
@@ -382,18 +401,22 @@ class SatEnvironment(BaseEnvironment):
 
             if self.phase_changed:
                 reward = (self.dijkstra_dist / self.dist_tot)*self.w_dest # Reward destinazione dinamico
+                # reward = 1.0 # Reward destinazione fisso ad 1 anche dopo cambio (oppure mettere che current_iter deve superare valore alto oltre cap iterazioni)
                 print(f"DEBUG: Reward DEST DINAMICO: {reward}")
             else:    
-                reward = 1 # Reward destinazione fisso ad 1
+                reward = 1.0 # Reward destinazione fisso ad 1
+                #reward = (self.dijkstra_dist / self.dist_tot)*self.w_dest # Reward destinazione dinamico
                 print(f"DEBUG: Reward DEST FISSO: {reward}")
             
             print("reward raggiunta destinazione", reward) # DEBUG reward            
             return reward
 
         # --- REWARD STEP ---
+
+        # - Gestione step reward base -
         # Vicini del previous_sat
         neighbors = self.sat_by_id[self.previous_sat]["neighbors"]
-
+        
         # Converte in interi, sono i vicini del sat "precedente"
         # Quindi ho almeno il sat da cui siamo arrivati al "precedente" ed il sat scelto in questo step (cioè dal "precedente")
         neighbor_ids = []
@@ -422,13 +445,37 @@ class SatEnvironment(BaseEnvironment):
             return 0.0 
         # Non posso avere divisione per zero, perchè ho sempre almeno un satellite da cui arrivo ed uno dove posso andare per le distanze
         # Molto difficilmente hanno esattamente la stessa distanza dalla destinazione, 
-        # ed il caso vicini tutti None è gestito implicitamente nello step (se non ho action valida sto fermo)
-        step_dyn_reward = ((1 - (d_current - d_near) / (d_far - d_near))) 
-        if self.step_counter <= self.dijkstra_hop: # Reward step (1/30*dinamico) se impiego <= step di dijkstra, altrimenti -(1/30*dinamico), mettendo w_step ad 1
-            reward = ((1/30)*step_dyn_reward*self.w_step) # 1/30 perchè 30 è il numero max di step per episodio
-        else:
-            reward = -((1/30)*step_dyn_reward*self.w_step)
+        # ed il caso vicini tutti None è gestito implicitamente nello step (se non ho action valida sto fermo)        
+        step_dyn_reward = ((1 - (d_current - d_near) / (d_far - d_near)))
+        base_reward = (1/30) * step_dyn_reward * self.w_step  # 1/30 perchè 30 è il numero max di step per episodio
+        
+        if self.step_counter > self.dijkstra_hop: # Reward step (1/30*dinamico) se impiego <= step di dijkstra, altrimenti -(1/30*dinamico), mettendo w_step ad 1
+            base_reward = -base_reward
         #reward = ((1 - (d_current - d_near) / (d_far - d_near))*self.w_step) # Reward step dinamico in base a bontà del vicino scelto
+        
+        # - FLAG: Imitation learning Dijkstra -
+        # Cambiare self.imit_learning in self.phase_changed per unire al curriculum learning
+        if self.imit_learning: # Cambiare flag in load_configuration se si vuole usare reward con esperto dijkstra o meno
+            
+            # Se il satellite scelto è il prossimo nel percorso ottimo
+            is_expert_choice = (len(self.optimal_path) > 1 and self.current_sat == self.optimal_path[1])
+            if is_expert_choice:
+                # Se il satellite scelto è il prossimo nel percorso ottimo
+                expert_bonus = 0.05 # Valore leggermente superiore a 1/30 (0.033)
+                reward = base_reward + expert_bonus
+                print(f"- Imitation learning - Step ok su sat:{self.current_sat}, reward: {reward}")
+                print(f"- rimozione sat {self.optimal_path[0]} dal path ottimale")
+                self.optimal_path.pop(0) 
+            else:
+                reward = base_reward # L'agente ha deviato, reward base
+                print(f"- Imitation learning - Step errato su sat:{self.current_sat}, reward: {reward}")
+                # Ricalcola il percorso ottimo dalla nuova posizione
+                self.optimal_path = nx.dijkstra_path(self.G, self.current_sat, self.end_id, weight='weight') # Commentare per usare dijsktra del flusso iniziale e non ricalcolare ogni volta
+                #for el in self.optimal_path: # DEBUG percorso dijkstra
+                #    print("Path ottimale: ")
+                #    print(f"sat:{el} ")
+        else:
+            reward = base_reward
         print ("reward step è", reward) # DEBUG reward
         return reward
 
@@ -512,3 +559,15 @@ class SatEnvironment(BaseEnvironment):
 
         distance = geodesic(coord1, coord2).kilometers
         return distance
+    
+    def _build_graph(self):
+        import networkx as nx
+        G = nx.Graph()
+        for sat_id, sat_info in self.sat_by_id.items():
+            G.add_node(sat_id)
+            for direction, neighbor_id in sat_info["neighbors"].items():
+                if neighbor_id != "None":
+                    neighbor_id = int(neighbor_id)
+                    dist = self.sat_distance(sat_info, self.sat_by_id[neighbor_id])
+                    G.add_edge(sat_id, neighbor_id, weight=dist)
+        return G
