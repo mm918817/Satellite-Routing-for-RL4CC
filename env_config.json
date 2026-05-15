@@ -6,6 +6,7 @@
   "flows_file": "flows_src__dst_timeline.json",
   "topology_file": "satellite_topology.json",
   "flows_dijkstra": "dijkstra_results.json",
-  "step_weight": 0,
-  "dest_weight":1
+  "step_weight": 1,
+  "dest_weight": 1,
+  "seed": 36
 }
