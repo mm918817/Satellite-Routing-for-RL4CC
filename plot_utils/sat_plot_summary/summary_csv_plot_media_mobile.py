@@ -17,11 +17,21 @@ WINDOW_SIZE_REWARD = 50 # Media mobile per il reward
 MAX_PENALTY = 700 # Valore assegnato ad ogni flusso NON concluso (eg: 350%, usare il massimo tra i vari summary, mettere a 0 con anche WINDOW_SIZE ad 1 e vedere il valore massimo che esce)
 TOT_FLOWS = 10 # Numero di flussi per ogni valutazione
 
+# --- PARAMETRI ZOOM ---
+ENABLE_ZOOM = True
+ZOOM_CENTER = 6000      # Dove centrare lo zoom (asse X)
+ZOOM_RANGE = 500        # Estensione prima e dopo
+ZOOM_Y_LIMIT = 105      # Limite superiore asse Y per i dettagli
+PADDING_PCT = 10        # Padding per grafici ptc e reward
+PADDING_RWD = 0.20
+
+
 # File summary.csv da includere
 files_to_plot = [
 
     "1",
-    "2"
+    "2",
+    #"3"
     #"A1 imit bonus 0.05",
     #"B1 imit bonus 0.05 lr 3k",
     #"B2 imit bonus 0.05 lr 3k",
@@ -107,7 +117,7 @@ metrics = [
     ("mean_reward_iter", "Average Reward per Iteration (min, max)", "reward_plot.png")
 ]
 
-# --- 1. GENERAZIONE PLOT % METRICHE PER ITERAZIONI---
+# --- 1 GENERAZIONE PLOT % METRICHE PER ITERAZIONI---
 if not files_to_plot:
     print("No file specified.")
 else:
@@ -227,12 +237,52 @@ else:
 
         plt.legend(loc='best') # Mostra quale linea appartiene a quale file
         
-        # Salva il grafico
+        # Salva il grafico (Full View)
         plt.savefig(os.path.join(output_folder, filename), dpi=300)
-        plt.close()
         print(f"Generated graph: {filename}")
 
-    # --- 2. GENERAZIONE GRAFICO MAX PERFORMANCE PER ERRORE ---
+        # Generazione ZOOM
+        if ENABLE_ZOOM:
+            plt.xlim(ZOOM_CENTER - ZOOM_RANGE, ZOOM_CENTER + ZOOM_RANGE)
+            
+            # Imposta il limite Y
+            if column == "mean_diff_iter":
+                plt.ylim(0, ZOOM_Y_LIMIT)
+            else:
+                # Per fare focus automatico su asse y
+                ax = plt.gca() # Recupera assi grafico 
+                visible_y = []
+
+                # Estrae tutti i valori della x ed y delle righe tracciate nel grafico
+                for line in ax.get_lines():
+                    xdata = line.get_xdata()
+                    ydata = line.get_ydata()
+                    
+                    # Crea una maschera per selezionare i dati dentro lo zoom
+                    mask = (xdata >= ZOOM_CENTER - ZOOM_RANGE) & (xdata <= ZOOM_CENTER + ZOOM_RANGE)
+                    
+                    if len(ydata) > 2: # Esclude le linee di soglia (hanno solo 2 punti)
+                        visible_y.extend(ydata[mask])
+
+                # Se ci sono dati validi nello zoom stringe l'asse Y intorno
+                if visible_y:
+                    y_min, y_max = min(visible_y), max(visible_y)
+                    
+                    if column.startswith("pct"):
+                        #padding = (y_max - y_min) * 0.05 if y_max != y_min else 2 # padding 5% sopra e sotto
+                        plt.ylim(max(0, y_min - PADDING_PCT), min(105, y_max + PADDING_PCT))
+                    
+                    elif column == "mean_reward_iter":
+                        plt.ylim(max(0, y_min - PADDING_RWD), min(105, y_max + PADDING_RWD))
+
+            plt.title(f"ZOOM {ZOOM_CENTER} (Range ±{ZOOM_RANGE}): {ylabel}")
+            zoom_filename = f"zoom_{ZOOM_CENTER}_{filename}"
+            plt.savefig(os.path.join(output_folder, zoom_filename), dpi=300)
+            print(f"Generated zoom graph: {zoom_filename}")
+            
+        plt.close()    
+
+    # --- 2 GENERAZIONE GRAFICO MAX PERFORMANCE PER ERRORE ---
     plt.figure(figsize=(10, 6))
     
     error_thresholds = [0, 10, 20, 30, 40, 50]
@@ -262,7 +312,7 @@ else:
     plt.close()
     print(f"Error summary graph, generated: {summary_filename}")
 
-# --- 3. GENERAZIONE TABELLA VALORE FINALE PER ROTTE OTTIMALI CONSIDERANDO ERRORE ---
+# --- 3 GENERAZIONE TABELLA VALORE FINALE PER ROTTE OTTIMALI CONSIDERANDO ERRORE ---
 print("\nGenerate final value summary table for optimal routes...")
 
 final_results = []
