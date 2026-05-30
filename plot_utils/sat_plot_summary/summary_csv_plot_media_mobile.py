@@ -9,17 +9,17 @@ output_folder = "plots"        # Dove salva i grafici
 os.makedirs(output_folder, exist_ok=True)
 
 X_SCALE = 5 # Evaluation ogni 5 iterazioni, nel summary.csv sono salvate ogni 1
-WINDOW_SIZE = 50  # Media mobile su 10 punti (50 iterazioni reali se X_SCALE=5)
-WINDOW_SIZE_OPT = 50 # Media mobile per rotta ottimale e con errori per poter calcolare: media, min e max su questo range di iterazioni
-WINDOW_SIZE_OPT_FINAL = 50 # Media mobile per tabella riassuntiva rotta ottimale
-WINDOW_SIZE_REWARD = 50 # Media mobile per il reward
+WINDOW_SIZE = 10  # Media mobile eg 10 punti (50 iterazioni reali se X_SCALE=5)
+WINDOW_SIZE_OPT = 10 # Media mobile per rotta ottimale e con errori per poter calcolare: media, min e max su questo range di iterazioni
+WINDOW_SIZE_OPT_FINAL = 10 # Media mobile per tabella riassuntiva rotta ottimale
+WINDOW_SIZE_REWARD = 10 # Media mobile per il reward
 # Parametri per la penalità (Per grafico scostamento rispetto a dijktra) 
-MAX_PENALTY = 700 # Valore assegnato ad ogni flusso NON concluso (eg: 350%, usare il massimo tra i vari summary, mettere a 0 con anche WINDOW_SIZE ad 1 e vedere il valore massimo che esce)
+MAX_PENALTY = 0 # Valore assegnato ad ogni flusso NON concluso (eg: 350%, usare il massimo tra i vari summary, mettere a 0 con anche WINDOW_SIZE ad 1 e vedere il valore massimo che esce)
 TOT_FLOWS = 10 # Numero di flussi per ogni valutazione
 
 # --- PARAMETRI ZOOM ---
 ENABLE_ZOOM = True
-ZOOM_CENTER = 6000      # Dove centrare lo zoom (asse X)
+ZOOM_CENTER = 4000      # Dove centrare lo zoom (asse X)
 ZOOM_RANGE = 500        # Estensione prima e dopo
 ZOOM_Y_LIMIT = 105      # Limite superiore asse Y per i dettagli
 PADDING_PCT = 10        # Padding per grafici ptc e reward
@@ -29,23 +29,24 @@ PADDING_RWD = 0.20
 # File summary.csv da includere
 files_to_plot = [
 
-    "1",
-    "2",
-    #"3"
+    "E2",
+    #"4"
     #"A1 imit bonus 0.05",
     #"B1 imit bonus 0.05 lr 3k",
     #"B2 imit bonus 0.05 lr 3k",
     #"C1 imit bonus 0.05 lr 3k, eps 0.4",
-    #"C2 imit bonus 0.05 lr 3k, eps 0.4",+
+    #"C2 imit bonus 0.05 lr 3k, eps 0.4",
     #"D1 imit bonus 0.05 lr 3k, eps 0.4, 2k reward",
     #"D2 imit bonus 0.05 lr 3k, eps 0.4, 2k reward",
-
-    #"bonus 3k 0.4 2k imit 22500",
 
     #"E1",
     #"E2",
     #"F1",
-    #F2",
+    #"F2",
+
+    #"D 8k iterazioni",
+    #"E 8k iterazioni",
+    #"F 8k iterazioni",
 
     #"E1 - n_step 5",
     #"E2 - n_step 5"
@@ -62,6 +63,10 @@ files_to_plot = [
 # Stile linee (se non specificato usa il default di Matplotlib)
 file_styles = {
 
+    "1": {"linestyle": "-", "linewidth": 0.5},
+    "2": {"linestyle": "-", "linewidth": 0.5},
+    "3": {"linestyle": "-", "linewidth": 0.5},
+
     "A1 imit bonus 0.05": {"linestyle": "-", "linewidth": 0.5},
     "B1 imit bonus 0.05 lr 3k": {"linestyle": "-", "linewidth": 0.5},
     "B2 imit bonus 0.05 lr 3k": {"linestyle": "-", "linewidth": 0.5},
@@ -69,6 +74,10 @@ file_styles = {
     "C2 imit bonus 0.05 lr 3k, eps 0.4": {"linestyle": "-", "linewidth": 0.5},
     "D1 imit bonus 0.05 lr 3k, eps 0.4, 2k reward": {"linestyle": "-", "linewidth": 0.5},
     "D2 imit bonus 0.05 lr 3k, eps 0.4, 2k reward": {"linestyle": "-", "linewidth": 0.5},
+
+    "D 8k iterazioni": {"linestyle": "-", "linewidth": 0.5},
+    "E 8k iterazioni": {"linestyle": "-", "linewidth": 0.5},
+    "F 8k iterazioni": {"linestyle": "-", "linewidth": 0.5},
 
     "bonus 3k 0.4 2k imit 22500": {"linestyle": "-", "linewidth": 0.5},
 
@@ -123,7 +132,10 @@ if not files_to_plot:
 else:
     for column, ylabel, filename in metrics:
         plt.figure(figsize=(12, 6))
-        
+
+        # Lista elementi da non mettere nello zoom (per deviaz. standard, min e max)
+        elements_to_hide = [] # Lista elementi da non mettere nello zoom (per deviaz. standard, min e max)
+
         for file_name in files_to_plot:
             file_path = os.path.join(input_folder, f"{file_name}.csv")
             
@@ -164,7 +176,9 @@ else:
                     # ** davanti ad un dizionario permette di spacchettare le coppie chiave e valore
                     # Trasformandole in argomenti per la funzione (usato per gli stili)
                     line, = plt.plot(x_values, y_smooth, label=file_name, **custom_args)
-                    plt.fill_between(x_values, y_min_window, y_max_window, color=line.get_color(), alpha=0.1)
+                    fill = plt.fill_between(x_values, y_min_window, y_max_window, color=line.get_color(), alpha=0.1)
+                    elements_to_hide.append(fill)
+
                     plt.title(f"Comparison ({WINDOW_SIZE_OPT}-points Moving Average): {ylabel}")
 
                 # --- CASE 2: Scostamento da Dijkstra (Media, Min/Max e Std Dev rispetto a un'iterazione, cioè riga del csv)
@@ -184,20 +198,21 @@ else:
                         y_max_smooth = row_max.rolling(window=WINDOW_SIZE, min_periods=1).mean()
                         
                         # Per area deviazione standard
-                        plt.fill_between(x_values, 
+                        fill1 = plt.fill_between(x_values, 
                                         (y_smooth - std_smooth).clip(lower=0), # (media - std_dev) per avere estremo inferiore
                                         (y_smooth + std_smooth).clip(upper=y_max_smooth), # (media + std_dev) per avere estremo superiore
                                         color=line.get_color(), alpha=0.25) # Etichetta  label=f"Std Dev {file_name}"
                         
-                        # Per estremi Min/Max
-                        plt.plot(x_values, y_max_smooth, color=line.get_color(), 
+                        # Per estremi Min/Max, la "," è usata per estrarre la linea dalla lista restituita da plt.plot
+                        line_max, = plt.plot(x_values, y_max_smooth, color=line.get_color(), 
                                 linestyle='--', linewidth=0.8, alpha=0.5)
-                        plt.plot(x_values, y_min_smooth, color=line.get_color(), 
+                        line_min, = plt.plot(x_values, y_min_smooth, color=line.get_color(), 
                                 linestyle='--', linewidth=0.8, alpha=0.5)
                         
                         # Per area tra i minimi e i massimi
-                        plt.fill_between(x_values, y_min_smooth.clip(lower=0), y_max_smooth, 
+                        fill2 = plt.fill_between(x_values, y_min_smooth.clip(lower=0), y_max_smooth, 
                                         color=line.get_color(), alpha=0.05)
+                        elements_to_hide.extend([fill1, line_max, line_min, fill2])
                         plt.title(f"Comparison ({WINDOW_SIZE}-points Moving Average): {ylabel}")
 
                 # --- CASE 4: Reward dell'iterazione (Media con ombra Min/Max, di cui si applica una finestra specificata ) ---
@@ -209,9 +224,10 @@ else:
                     line, = plt.plot(x_values, y_smooth, label=file_name, **custom_args)
                     
                     # Area tra il minimo e il massimo dei reward registrati in quell'iterazione
-                    plt.fill_between(x_values, y_min_smooth, y_max_smooth, 
+                    fill = plt.fill_between(x_values, y_min_smooth, y_max_smooth, 
                                      color=line.get_color(), alpha=0.15)
-                    
+                    elements_to_hide.append(fill)
+
                     plt.title(f"Reward Trend ({WINDOW_SIZE_REWARD}-points Moving Average): {ylabel}")
                 # --- CASE 3: Flussi conclusi (Media rispetto alla finestra specificata)
                 else:
@@ -237,12 +253,17 @@ else:
 
         plt.legend(loc='best') # Mostra quale linea appartiene a quale file
         
-        # Salva il grafico (Full View)
+        # Salva il grafico "Full View"
         plt.savefig(os.path.join(output_folder, filename), dpi=300)
         print(f"Generated graph: {filename}")
 
         # Generazione ZOOM
         if ENABLE_ZOOM:
+
+            # Imposta elementi deviaz. standard, min e max invisibili per lo zoom
+            for el in elements_to_hide:
+                el.set_visible(False)
+
             plt.xlim(ZOOM_CENTER - ZOOM_RANGE, ZOOM_CENTER + ZOOM_RANGE)
             
             # Imposta il limite Y
