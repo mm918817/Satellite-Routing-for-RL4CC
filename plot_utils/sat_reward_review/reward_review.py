@@ -45,7 +45,7 @@ class RewardValidator:
         report_data = [] # Lista dati per CSV/json
 
         print(f"{'='*66}")
-        print(f"{'VALIDAZIONE REWARD':^60}")
+        print(f"{'REWARD VALIDATION':^60}")
         print(f"{'='*66}\n")
 
         for flow in self.eval_flows:
@@ -57,7 +57,7 @@ class RewardValidator:
             # Recupera il path dijkstra pre-calcolato
             d_entry = self.dijkstra_lookup.get((t, s_id, e_id))
             if not d_entry:
-                print(f"Path dijkstra non trovato per Flow {flow_uuid} ({s_id}->{e_id}) al tempo {t}")
+                print(f" Dijkstra path not found for the {flow_uuid} flow ({s_id}->{e_id}) at time {t}")
                 continue
 
             path = d_entry["path"]
@@ -72,7 +72,7 @@ class RewardValidator:
             end_sat = current_topo[e_id]
             jumps_rewards_list = []
 
-            print(f"=> Analisi Flow {flow_uuid} | Route: {s_id} -> {e_id} | Time: {t}")
+            print(f"=> Flow {flow_uuid} | Route: {s_id} -> {e_id} | Time: {t}")
             print(f"{'-'*66}")
 
             # Simula inoltro(salto) da un sat ad un altro del path Dijkstra
@@ -97,7 +97,7 @@ class RewardValidator:
                     reward = (d_dist / dist_tot) * self.w_dest # Reward destinazione dinamico (dovrebbe essere in base alla distanza di dijkstra)
                     # reward = 1 # Reward fisso ad 1
                     #print(f"Reward dest: {reward}") # Debug
-                    label = "FINALE(Dest)"
+                    label = "FINAL(Dest)"
                 else:
                     # Reward Step
                     neighbors_dict = s_prev["neighbors"]
@@ -118,7 +118,7 @@ class RewardValidator:
                     # Logica basata sugli step di dijkstra (1/30)
                     if step_counter <= d_hop:
                         reward = (1/30) * step_dyn_reward * self.w_step
-                        reward = reward + 0.05 # Bonus se agente si comporta come dijsktra (imitation learning leggero)
+                        #reward = reward + 0.05 # Bonus se agente si comporta come dijsktra (imitation learning leggero)
                     else:
                         reward = -((1/30) * step_dyn_reward * self.w_step)
                     #reward = 1 # Reward fisso ad 1 (imitation learning forte)
@@ -156,7 +156,7 @@ class RewardValidator:
             all_distances.append(dist_tot)
             # Stampa riassuntiva flusso
             print(f"{'-'*66}")
-            print(f"  RISULTATO: Distanza Tot: {dist_tot:.2f} km | Reward Tot: {total_reward:.5f}\n")
+            print(f"  Result: Tot Distance: {dist_tot:.2f} km | Tot Reward: {total_reward:.5f}\n")
 
         # --- EXPORT CSV ---
         keys = report_data[0].keys()
@@ -170,8 +170,8 @@ class RewardValidator:
             json.dump(report_data, f, indent=4)
 
         print("-" * 60)
-        print(f"Media Distanza Tot: {np.mean(all_distances):.4f} km e Media Reward Tot: {np.mean(all_rewards):.4f}") #Media fatta sui reward totali tra i flussi
-        print(f"Report salvati: {output_path}.csv e {output_path}.json")
+        print(f"Tot Distance mean: {np.mean(all_distances):.4f} km and Tot Reward mean: {np.mean(all_rewards):.4f}") #Media fatta sui reward totali tra i flussi
+        print(f"Report saved: {output_path}.csv and {output_path}.json")
 
 # --- ESECUZIONE ---
 validator = RewardValidator(

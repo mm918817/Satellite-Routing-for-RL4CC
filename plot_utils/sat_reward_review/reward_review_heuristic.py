@@ -3,6 +3,7 @@ import numpy as np
 from geopy.distance import geodesic
 import time
 import csv
+import networkx as nx
 
 class RewardValidator:
     def __init__(self, topo_file, eval_file, dijkstra_file, w_step=1.0, w_dest=1.0):
@@ -39,13 +40,26 @@ class RewardValidator:
     def get_dist(self, s1, s2):
         return geodesic((s1['lat'], s1['lon']), (s2['lat'], s2['lon'])).kilometers
 
+# Crea il grafo per l'istante temporale corrente
+    def _build_graph(self, current_topo):
+        G = nx.Graph()
+        for sat_id, sat_info in current_topo.items():
+            G.add_node(sat_id)
+            for direction, neighbor_id in sat_info["neighbors"].items():
+                if str(neighbor_id) != "None":
+                    neighbor_id = int(neighbor_id)
+                    if neighbor_id in current_topo:
+                        dist = self.get_dist(sat_info, current_topo[neighbor_id])
+                        G.add_edge(sat_id, neighbor_id, weight=dist)
+        return G
+
     def run_validation(self, output_path="reward_report"):
         all_rewards = []
         all_distances = []
         report_data = [] # Lista dati per CSV/json
 
         print(f"{'='*66}")
-        print(f"{'VALIDAZIONE REWARD':^60}")
+        print(f"{'REWARD VALIDATION':^60}")
         print(f"{'='*66}\n")
 
         for flow in self.eval_flows:
@@ -57,7 +71,7 @@ class RewardValidator:
             # Recupera il path dijkstra pre-calcolato
             d_entry = self.dijkstra_lookup.get((t, s_id, e_id))
             if not d_entry:
-                print(f"Path dijkstra non trovato per Flow {flow_uuid} ({s_id}->{e_id}) al tempo {t}")
+                print(f" Dijkstra path not found for the {flow_uuid} flow ({s_id}->{e_id}) at time {t}")
                 continue
 
             path = d_entry["path"]
@@ -73,6 +87,14 @@ class RewardValidator:
             end_sat = current_topo[e_id]
             jumps_rewards_list = []
 
+
+            # --- Costruzione grafo e path ottimale iniziale ---
+            G = self._build_graph(current_topo)
+            try:
+                optimal_path = nx.dijkstra_path(G, s_id, e_id, weight='weight')
+            except nx.NetworkXNoPath:
+                print(f" Nessun percorso Dijkstra possibile per {s_id}->{e_id} a tempo {t}")
+                continue
 
             # --- Costruzione Percorso ---
             #  Basato sulla distanza minore tra i vicini
@@ -98,13 +120,13 @@ class RewardValidator:
 
                 # Se finisce in un vicolo cieco si interrompe
                 if best_neighbor is None:
-                    print(f"  -!- Bloccato in un vicolo cieco {curr_id}")
+                    print(f"  -!- Stuck in a dead end {curr_id}")
                     break
                     
                 path.append(best_neighbor)
                 curr_id = best_neighbor
 
-            print(f"=> Analisi Flow {flow_uuid} | Route: {s_id} -> {e_id} | Time: {t}")
+            print(f"=> Flow {flow_uuid} | Route: {s_id} -> {e_id} | Time: {t}")
             print(f"{'-'*66}")
 
             # Simula inoltro(salto) da un sat ad un altro del path calcolato sopra
@@ -126,10 +148,10 @@ class RewardValidator:
                 # --- LOGICA REWARD ---
                 if curr_id == e_id:
                     # Reward Destinazione
-                    reward = (d_dist / dist_tot) * self.w_dest # Reward destinazione dinamico (dovrebbe essere in base alla distanza di dijkstra)
-                    # reward = 1 # Reward fisso ad 1
+                    #reward = (d_dist / dist_tot) * self.w_dest # Reward destinazione dinamico (dovrebbe essere in base alla distanza di dijkstra)
+                    reward = 1.0 # Reward fisso ad 1
                     #print(f"Reward dest: {reward}") # Debug
-                    label = "FINALE(Dest)"
+                    label = "FINAL(Dest)"
                 else:
                     # Reward Step
                     neighbors_dict = s_prev["neighbors"]
@@ -149,19 +171,34 @@ class RewardValidator:
                     
                     # Logica basata sugli step di dijkstra (1/30)
                     if step_counter <= d_hop:
-                        reward = (1/30) * step_dyn_reward * self.w_step
-                        reward = reward + 0.05 # Bonus se agente si comporta come dijsktra (imitation learning leggero)
+                        base_reward = (1/30) * step_dyn_reward * self.w_step
                     else:
-                        reward = -((1/30) * step_dyn_reward * self.w_step)
-                    #reward = 1 # Reward fisso ad 1 (imitation learning forte)
-                    label = f"STEP {step_counter}"
+                        base_reward = -((1/30) * step_dyn_reward * self.w_step)
+
+                    # --- Logica imitation learning ---
+                    is_expert_choice = (len(optimal_path) > 1 and curr_id == optimal_path[1])
+
+                    if is_expert_choice:
+                        reward = base_reward + 0.05 # Bonus se agente si comporta come dijsktra (imitation learning leggero)
+                        #reward = 1 # Reward fisso ad 1 (imitation learning forte)
+                        optimal_path.pop(0) # Avanza lungo il percorso corretto
+                        label = f"STEP {step_counter} (OK)"
+                    else:
+                        # Deviazione, reward base e ricalcolo percorso
+                        reward = base_reward + 0.0 
+                        #reward = 0 # Reward 0 se sbaglia (imitation learning forte)
+                        label = f"STEP {step_counter} (DEV)"
+                        try:
+                            optimal_path = nx.dijkstra_path(G, curr_id, e_id, weight='weight')
+                        except nx.NetworkXNoPath:
+                            pass # Se si incastra rimane bloccato fino al timeout
 
                     #print(f"Reward step: {reward}") # Debug
                 
                 total_reward += reward
                 jumps_rewards_list.append(round(reward, 5))
 
-                print(f"  {label:<12} | {prev_id:>3} -> {curr_id:<3} | Dist: {dist_jump:>7.2f} km | Reward: {reward:>8.5f}")
+                print(f"  {label:<15} | {prev_id:>3} -> {curr_id:<3} | Dist: {dist_jump:>7.2f} km | Reward: {reward:>8.5f}")
 
             # --- PREPARAZIONE DATI PER REPORT ---
             # Creazione riga per report
@@ -188,7 +225,7 @@ class RewardValidator:
             all_distances.append(dist_tot)
             # Stampa riassuntiva flusso
             print(f"{'-'*66}")
-            print(f"  RISULTATO: Distanza Tot: {dist_tot:.2f} km | Reward Tot: {total_reward:.5f}\n")
+            print(f"  Result: Tot Distance: {dist_tot:.2f} km | Tot Reward: {total_reward:.5f}\n")
 
         # --- EXPORT CSV ---
         keys = report_data[0].keys()
@@ -202,8 +239,8 @@ class RewardValidator:
             json.dump(report_data, f, indent=4)
 
         print("-" * 60)
-        print(f"Media Distanza Tot:{np.mean(all_distances):.4f} km e Media Reward Tot: {np.mean(all_rewards):.4f}") #Media fatta sui reward totali tra i flussi
-        print(f"Report salvati: {output_path}.csv e {output_path}.json")
+        print(f"Tot Distance mean: {np.mean(all_distances):.4f} km and Tot Reward mean: {np.mean(all_rewards):.4f}") #Media fatta sui reward totali tra i flussi
+        print(f"Report saved: {output_path}.csv and {output_path}.json")
 
 # --- ESECUZIONE ---
 validator = RewardValidator(
