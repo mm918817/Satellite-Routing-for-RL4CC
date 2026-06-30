@@ -86,8 +86,7 @@ class SatelliteNetwork:
     
 def save_results_to_json(results, folder_name="flows_dijkstra_results", filename="dijkstra_results.json"):
     """
-    Salva i risultati in un file JSON dentro una cartella.
-    La cartella viene creata se non esiste.
+    Salva i risultati in un file JSON dentro una cartella che viene creata se non esiste.
     """
 
     # Percorso della directory dello script
@@ -104,7 +103,7 @@ def save_results_to_json(results, folder_name="flows_dijkstra_results", filename
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(results, f, indent=2)
 
-    print(f"Risultati salvati in: {output_file}")
+    print(f"Results saved in: {output_file}")
 
 # Utilizza, specificando il "time" usato per selezionare la topologia ed i flussi associati
 if __name__ == "__main__":
@@ -114,16 +113,16 @@ if __name__ == "__main__":
         "flows_src__dst_timeline.json"
     )
 
-    print("Vuoi:")
-    print("1 - Calcolare i flow per un time specifico")
-    print("2 - Calcolare i flow per TUTTI i time")
+    print("Do you want to:")
+    print("1 - Calculate the flow for a specific time?")
+    print("2 - Calculate the flow for ALL the times ")
 
-    choice = input("Seleziona (1/2): ").strip()
+    choice = input("Select (1/2): ").strip()
 
     all_results = []
 
     if choice == "1":
-        flow_time = int(input("Inserisci il valore di time: "))
+        flow_time = int(input("Insert the time value: "))
         flow_results = network.compute_flows_dijkstra(flow_time)
         all_results.extend(flow_results)
 
@@ -132,12 +131,12 @@ if __name__ == "__main__":
         all_times = sorted(set(f["time"] for f in network.flows))
 
         for t in all_times:
-            print(f"\n--- Calcolo flow per time = {t} ---")
+            print(f"\n--- Calculating flow for time = {t} ---")
             flow_results = network.compute_flows_dijkstra(t)
             all_results.extend(flow_results)
 
     else:
-        raise ValueError("Scelta non valida. Usa 1 o 2.")
+        raise ValueError("Invalid choice: use 1 or 2.")
 
     # Salvataggio unico
     save_results_to_json(all_results)
@@ -150,8 +149,8 @@ if __name__ == "__main__":
 
     if valid_distances:
         max_dist = max(valid_distances)
-        print("\n" + "="*30)
-        print(f"DISTANZA MASSIMA TROVATA: {max_dist:.2f} km")
-        print("="*30)
+        print("\n" + "-"*36)
+        print(f"MAXIMUM DISTANCE FOUND: {max_dist:.2f} km")
+        print("-"*36)
     else:
-        print("\nNessuna distanza calcolabile trovata.")
+        print("\nNo calculable distances found.")

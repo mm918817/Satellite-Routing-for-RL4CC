@@ -14,6 +14,7 @@ with open(file_path, "r") as f:
 # Lookup topologie per time
 topo_by_time = {t["time"]: t for t in topologies}
 
+
 # ---------------- Functions ----------------
 
 # Trova satelliti con vicini duplicati in una topologia
@@ -43,6 +44,7 @@ def satellites_with_duplicate_neighbors(topology):
 
     return result
 
+
 # Controlla tutte le topologie
 def find_duplicates_in_all_topologies(topologies):
     result = defaultdict(list)
@@ -58,19 +60,31 @@ def find_duplicates_in_all_topologies(topologies):
 
 
 # Esecuzione
-
 all_duplicates = find_duplicates_in_all_topologies(topologies)
 
 
 # Stampa risultati
-
 if not all_duplicates:
-    print("Nessun satellite con vicini duplicati trovato.")
+    print("No satellites with duplicate neighbors found...")
 else:
+    # Stampa il dettaglio dei satelliti per ogni iterazione
     for time, sats in all_duplicates.items():
         print(f"\nTime {time}:")
         for s in sats:
             print(
                 f"  Satellite {s['satellite_id']} "
-                f"-> vicini duplicati {s['duplicate_neighbors']}"
+                f"-> duplicate neighbors {s['duplicate_neighbors']}"
             )
+
+    print("\n" + "-"*40 + "\n")
+
+    #Stampa il riepilogo di tutti i time
+    affected_topologies_count = 0
+    for time, sats in all_duplicates.items():
+        num_duplicates = len(sats)
+        print(f"Time  {time}  : {num_duplicates} duplicate neighbors")
+        affected_topologies_count += 1
+
+    # Stampa del totale delle topologie affette
+    print(f"\nTotal number of affected topologies: {affected_topologies_count}")
+    input()
