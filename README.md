@@ -176,7 +176,7 @@ sample file view:
         "active_links_count": 85
     },
     {
-     "..." // additional entries   
+     "..."   
     }
 ]    
 ```
@@ -217,7 +217,7 @@ sample file view:
     "path": [
       146,
       102,
-      "..." // additional entries 
+      "..."
     ]
   }
 ]
@@ -388,7 +388,7 @@ sample file view:
         "jump_4_reward": -0.03333,
         "jump_5_reward": 0.67044,
         "jump_6_reward": null,
-        "..." // additional entries 
+        "..."
     }
 ] 
 ```
