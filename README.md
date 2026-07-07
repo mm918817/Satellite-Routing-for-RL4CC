@@ -176,9 +176,9 @@ sample file view:
         "active_links_count": 85
     },
     {
-    .
-    .
-    .
+     "..." // additional entries   
+    }
+]    
 ```
 
 **`sat_dijkstra.py`**: Calculates the shortest path via Dijkstra's algorithm for every flow within `flows_src__dst_timeline.json`(with all the flows, not yet extracted those for `flows_eval.json`) using the timestamp topologies from `satellite_topology.json`. It generate `dijkstra_results.json` that contains the following data for every flow: 
@@ -217,10 +217,11 @@ sample file view:
     "path": [
       146,
       102,
-      .
-      .
-      .
-```
+      "..." // additional entries 
+    ]
+  }
+]
+```  
 
 **`dijkstra_hop_number.py`**: Reads `dijkstra_results.json` to output a chart illustrating the total percentage distribution of optimal path lengths, measured as number of elements in the path (nodes).
 
@@ -387,8 +388,7 @@ sample file view:
         "jump_4_reward": -0.03333,
         "jump_5_reward": 0.67044,
         "jump_6_reward": null,
-        "jump
-    .
-    .
-    .
+        "..." // additional entries 
+    }
+] 
 ```
