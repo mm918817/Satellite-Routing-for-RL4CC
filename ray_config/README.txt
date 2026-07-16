@@ -1,0 +1,1 @@
+Examples of ray_config files for executing the simple reward configurations and the curriculum learning ones
