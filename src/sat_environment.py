@@ -210,7 +210,7 @@ class SatEnvironment(BaseEnvironment):
 
             if current_iter >= 750: # Iterazione target per cambio reward (es. 750)
                 self.phase_changed = True
-            if current_iter >=3000:
+            if current_iter >= 3900:
                 self.imit_learning = True
         
         if self.is_evaluation:
@@ -448,7 +448,7 @@ class SatEnvironment(BaseEnvironment):
         # ed il caso vicini tutti None è gestito implicitamente nello step (se non ho action valida sto fermo)        
         step_dyn_reward = ((1 - (d_current - d_near) / (d_far - d_near)))
         base_reward = (1/30) * step_dyn_reward * self.w_step  # 1/30 perchè 30 è il numero max di step per episodio
-        
+        #base_reward = 1.0
         if self.step_counter > self.dijkstra_hop: # Reward step (1/30*dinamico) se impiego <= step di dijkstra, altrimenti -(1/30*dinamico), mettendo w_step ad 1
             base_reward = -base_reward
         #reward = ((1 - (d_current - d_near) / (d_far - d_near))*self.w_step) # Reward step dinamico in base a bontà del vicino scelto
@@ -463,11 +463,13 @@ class SatEnvironment(BaseEnvironment):
                 # Se il satellite scelto è il prossimo nel percorso ottimo
                 expert_bonus = 0.05 # Valore leggermente superiore a 1/30 (0.033)
                 reward = base_reward + expert_bonus
+                #reward = 1.0 * self.w_step # imit learning forte
                 print(f"- Imitation learning - Step ok su sat:{self.current_sat}, reward: {reward}")
                 print(f"- rimozione sat {self.optimal_path[0]} dal path ottimale")
                 self.optimal_path.pop(0) 
             else:
                 reward = base_reward # L'agente ha deviato, reward base
+                #reward = 0 # imit learning forte
                 print(f"- Imitation learning - Step errato su sat:{self.current_sat}, reward: {reward}")
                 # Ricalcola il percorso ottimo dalla nuova posizione
                 self.optimal_path = nx.dijkstra_path(self.G, self.current_sat, self.end_id, weight='weight') # Commentare per usare dijsktra del flusso iniziale e non ricalcolare ogni volta
