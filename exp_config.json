@@ -5,6 +5,6 @@
   "tune_config_file": "tune_config.json",
   "evaluation_interval": 5,
   "stopping_criteria": {
-    "max_iterations": 30
+    "max_iterations": 10000
   }
 }

@@ -1,24 +1,46 @@
 {
   "training": {
-    "batch_size": 64,
-    "num_train_batches": 4,
-    "lr": 0.0005,
+    "batch_size": 128,
+    "num_train_batches": 2,
     "gamma": 0.99,
+    "n_step": 6,
+
+    "lr_schedule": [
+        [0, 0.001],
+        [120000, 0.001],
+        [120001, 0.0002],
+        [450000, 0.0002],
+        [450001, 0.0001],
+        [1650000, 0.0001]
+    ],
+
     "exploration_config": {
         "type": "EpsilonGreedy",
-        "initial_epsilon": 1.0,
-        "final_epsilon": 0.05,
-        "epsilon_timesteps": 120000
+        "epsilon_schedule": {
+          "type": "PiecewiseSchedule",
+          "endpoints": [
+            [0, 1.0],
+            [120000, 0.05],
+            [120001, 1.0],
+            [450000, 0.05],
+            [450001, 0.4],
+            [750000, 0.05],
+            [1650000,0.05]
+            
+          ],
+          "framework": "torch"
+        }
+      
     },
     "num_steps_sampled_before_learning_starts": 0,
     "model": {
-      "fcnet_hiddens": [64, 64],
+      "fcnet_hiddens": [128, 128],
       "fcnet_activation": "relu"
     },
     "replay_buffer_config": {
       "type": "MultiAgentReplayBuffer",
       "capacity": 3000,
-      "worker_side_prioritization": false
+        "worker_side_prioritization": false
     }
   },
   "evaluation": {
@@ -30,7 +52,7 @@
   },
   "rollouts": {
     "num_rollout_workers": 1,
-    "duration_per_worker": 1,
+    "duration_per_worker": 5,
     "duration_unit": "episodes"
   },
   "callbacks": {
