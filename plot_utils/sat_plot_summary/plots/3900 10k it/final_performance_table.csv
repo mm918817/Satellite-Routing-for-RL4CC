@@ -1,0 +1,3 @@
+Configuration,Optimal (0%),Error ≤10%,Error ≤20%,Error ≤30%,Error ≤40%,Error ≤50%
+"E cur+imit 3900, n_step6 10k it 1",57.60%,82.20%,94.20%,96.20%,98.80%,98.80%
+"E cur+imit 3900, n_step6 10k it 2",72.40%,87.60%,96.20%,99.00%,99.00%,99.00%

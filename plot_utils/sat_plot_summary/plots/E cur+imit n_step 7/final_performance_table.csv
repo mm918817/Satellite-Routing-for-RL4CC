@@ -1,0 +1,4 @@
+Configuration,Optimal (0%),Error ≤10%,Error ≤20%,Error ≤30%,Error ≤40%,Error ≤50%
+E cur+imit n_step 7 1,51.00%,78.60%,89.20%,89.40%,89.40%,89.40%
+E cur+imit n_step 7 2,58.60%,82.20%,84.60%,88.00%,91.60%,94.60%
+E cur+imit n_step 7 3,66.80%,85.20%,96.60%,98.20%,98.20%,98.20%
