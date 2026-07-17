@@ -2,7 +2,7 @@ import json
 import pandas as pd
 import os
 
-# ----- Script per convertire il file "evaluations.json" in un csv filtrato preso da cartella in results (EVALUATION) -----
+# ----- Script per convertire il file "evaluations.json" preso da cartella in results, in un csv filtrato (EVALUATION) -----
 
 # File input ed output
 input_json = 'evaluations.json' 
@@ -24,7 +24,7 @@ mapping = {
 
 def process_json_to_csv(input_path, output_path):
     if not os.path.exists(input_path):
-        print(f"Errore: Il file '{input_path}' non esiste.")
+        print(f"Error: file '{input_path}' does not exist.")
         return
 
     try:
@@ -71,13 +71,13 @@ def process_json_to_csv(input_path, output_path):
             'hist_stats/dijkstra_hop',
         ]
         
-        # Salvataggio (usiamo il quoting per evitare che le virgole nelle liste rompano il CSV)
+        # Salvataggio (usa il quoting per evitare che le virgole nelle liste rompano il CSV)
         df.to_csv(output_path, columns=final_columns, index=False)
         
-        print(f"Successo! Creato '{output_path}' con {len(df)} righe (una per iterazione).")
+        print(f"Success! Created '{output_path}' with {len(df)} rows (one per iteration).")
 
     except Exception as e:
-        print(f"Si è verificato un errore: {e}")
+        print(f"An error occurred: {e}")
 
 if __name__ == "__main__":
     process_json_to_csv(input_json, output_csv)

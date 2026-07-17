@@ -247,6 +247,7 @@ sample image view:
 sample image view:
 
 <img src="topology_animation.gif" alt="alt text" width="70%" height="70%">
+
 ---
 4. sat_plot_csv (Results Processing Pipeline)
 

@@ -101,7 +101,7 @@ with open(output_file, 'w') as f:
             try:
                 d_ok = dest_reached[last_idx] # L'elemento all'ultima posizione di di dest_reached mi dice se sono arrivato a destinazione(1) o no(0)
 
-                # Se l'agente è arrivato a destinazione calcolo lo scostamento rispetto a dijkstra
+                # Se l'agente è arrivato a destinazione calcola lo scostamento rispetto a dijkstra
                 if d_ok:
                     concluded += 1
                     dist_val = distances[last_idx] # Recupera la distanza all'ultimo step dell'episodio (quella maggiore per l'ep)
@@ -241,6 +241,6 @@ summary_df = summary_df.fillna("-")
 
 summary_df.to_csv(summary_csv, index=False)
 
-print(f"Processo completato.")
+print(f"Process completed.")
 print(f"Report TXT: {output_file}")
 print(f"Summary CSV: {summary_csv}")

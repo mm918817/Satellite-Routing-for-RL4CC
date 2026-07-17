@@ -3,23 +3,34 @@ import matplotlib.pyplot as plt
 import os
 import time
 
+plt.rcParams.update({
+    'font.size': 14, # font size base
+    'axes.titlesize': 16,
+    'axes.labelsize': 16,
+    'xtick.labelsize': 14,
+    'ytick.labelsize': 14,
+    'legend.fontsize': 13,
+    'figure.titlesize': 16
+})
+
+
 # --- CONFIGURAZIONE ---
 input_folder = "summaries_csv"  # Cartella dove cerca i summary.csv
 output_folder = "plots"        # Dove salva i grafici
 os.makedirs(output_folder, exist_ok=True)
 
 X_SCALE = 5 # Evaluation ogni 5 iterazioni, nel summary.csv sono salvate ogni 1
-WINDOW_SIZE = 10  # Media mobile eg 10 punti (50 iterazioni reali se X_SCALE=5)
-WINDOW_SIZE_OPT = 10 # Media mobile per rotta ottimale e con errori per poter calcolare: media, min e max su questo range di iterazioni
-WINDOW_SIZE_OPT_FINAL = 10 # Media mobile per tabella riassuntiva rotta ottimale
-WINDOW_SIZE_REWARD = 10 # Media mobile per il reward
+WINDOW_SIZE = 50  # Media mobile eg 10 punti (50 iterazioni reali se X_SCALE=5)
+WINDOW_SIZE_OPT = 50 # Media mobile per rotta ottimale e con errori per poter calcolare: media, min e max su questo range di iterazioni
+WINDOW_SIZE_OPT_FINAL = 50 # Media mobile per tabella riassuntiva rotta ottimale
+WINDOW_SIZE_REWARD = 50 # Media mobile per il reward
 # Parametri per la penalità (Per grafico scostamento rispetto a dijktra) 
-MAX_PENALTY = 0 # Valore assegnato ad ogni flusso NON concluso (eg: 350%, usare il massimo tra i vari summary, mettere a 0 con anche WINDOW_SIZE ad 1 e vedere il valore massimo che esce)
+MAX_PENALTY = 700 # Valore assegnato ad ogni flusso NON concluso (eg: 350%, usare il massimo tra i vari summary, mettere a 0 con anche WINDOW_SIZE ad 1 e vedere il valore massimo che esce)
 TOT_FLOWS = 10 # Numero di flussi per ogni valutazione
 
 # --- PARAMETRI ZOOM ---
 ENABLE_ZOOM = True
-ZOOM_CENTER = 4000      # Dove centrare lo zoom (asse X)
+ZOOM_CENTER = 5500      # Dove centrare lo zoom (asse X)
 ZOOM_RANGE = 500        # Estensione prima e dopo
 ZOOM_Y_LIMIT = 105      # Limite superiore asse Y per i dettagli
 PADDING_PCT = 10        # Padding per grafici ptc e reward
@@ -29,7 +40,41 @@ PADDING_RWD = 0.20
 # File summary.csv da includere
 files_to_plot = [
 
-    "E2",
+    #"dest 1, step1 1",
+    #"dest 1, step1 2",
+    #"dest 1, step0 3",
+    #"cur E1 reset eps 120k e lr 0.0002, 4000 it",
+    #"cur E2 reset eps 120k e lr 0.0002, 4000 it",
+    #"imit learning hard 2",
+    #"E cur+imit 3900, n_step7 7k it 1",
+    #"Curriculum + Imitation",
+
+    #"Objective 1",
+    #"Objective 2",
+    #"Curriculum",
+    #"Curriculum + imitation 1",
+    #"Curriculum + imitation 2",
+    #"EErf 1",
+    #"EErf 2",
+    #"Hard imitation",
+    #"Soft imitation (EERF)",
+    #"5",
+    #"6",
+    #"7",
+
+
+    "DOrf",
+    "PErf",
+    "EErf",
+    #"dest din, step0 2"
+    #"dest 1, step dijk30 1",
+    #"dest 1, step dijk30 2",
+    #"dest din, step dijk30 1",
+    #"dest din, step dijk30 2",
+    #"dest din, step dijk30 11",
+    #"dest din, step dijk30 22",
+    #"dest 1, step dijk30 1",
+    #"dest 1, step dijk30 2",
     #"4"
     #"A1 imit bonus 0.05",
     #"B1 imit bonus 0.05 lr 3k",
@@ -62,10 +107,25 @@ files_to_plot = [
 
 # Stile linee (se non specificato usa il default di Matplotlib)
 file_styles = {
-
+    "Curriculum 1": {"color": "tab:blue", "linestyle": "-", "linewidth": 1.0},
+    "Curriculum 2": {"color": "tab:orange", "linestyle": "-", "linewidth": 1.0},
+    "Curriculum + imitation 1": {"color": "tab:blue", "linestyle": "-", "linewidth": 1.0},
+    "Curriculum + imitation 2": {"color": "tab:orange", "linestyle": "-", "linewidth": 1.0},
+    "EErf (hard) 1": {"color": "tab:blue", "linestyle": "-", "linewidth": 1.0},
+    "EErf (hard) 2": {"color": "tab:blue", "linestyle": "-", "linewidth": 1.0},
+    "EErf 1": {"color": "tab:orange", "linestyle": "-", "linewidth": 1.0},
+    "EErf 2": {"color": "tab:orange", "linestyle": "-", "linewidth": 1.0},
+    "Peak 1": {"linestyle": "-", "linewidth": 1.0},
+    "Peak 2": {"linestyle": "-", "linewidth": 1.0},
+    "3": {"linestyle": "-", "linewidth": 0.8},
     "1": {"linestyle": "-", "linewidth": 0.5},
     "2": {"linestyle": "-", "linewidth": 0.5},
-    "3": {"linestyle": "-", "linewidth": 0.5},
+
+    "DOrf": {"color": "tab:blue", "linestyle": "-", "linewidth": 1.0},
+    "PErf": {"color": "tab:orange", "linestyle": "-", "linewidth": 1.0},
+    "EErf": {"color": "tab:green", "linestyle": "-", "linewidth": 1.0},
+
+    
 
     "A1 imit bonus 0.05": {"linestyle": "-", "linewidth": 0.5},
     "B1 imit bonus 0.05 lr 3k": {"linestyle": "-", "linewidth": 0.5},
@@ -97,8 +157,8 @@ file_styles = {
     "A2 - n_step 1": {"color": "tab:blue", "linestyle": "-", "linewidth": 1},
 
 
-    "cur E1 reset eps 120k e lr 0.0002, 4000 it": {"color": "tab:red", "linestyle": ":","alpha": 0.5, "linewidth": 1},
-    "cur E2 reset eps 120k e lr 0.0002, 4000 it": {"color": "tab:purple", "linestyle": "-", "linewidth": 1},
+    #"cur E1 reset eps 120k e lr 0.0002, 4000 it": {"color": "tab:red", "linestyle": ":","alpha": 0.5, "linewidth": 1},
+    #"cur E2 reset eps 120k e lr 0.0002, 4000 it": {"color": "tab:purple", "linestyle": "-", "linewidth": 1},
     #"A2 - dest 1, step dijk30": {"color": "tab:blue", "linestyle": "-", "linewidth": 1},
     #"B3 - dest din, step dijk30": {"color": "tab:orange", "linestyle": "-", "linewidth": 1},
     #"A3 - dest 1, step dijk30": {"color": "tab:grey", "linestyle": ":","alpha": 0.5, "linewidth": 1},
@@ -237,10 +297,17 @@ else:
 
         
         if column == "mean_diff_iter":
-            plt.axhline(y=25, color='gold', linestyle='--', linewidth=0.5, label='Thresholds 25, 50%')
-            plt.axhline(y=50, color='gold', linestyle='--', linewidth=0.5)
-            plt.axhline(y=10, color='black', linestyle='--', linewidth=0.5, label='Threshold 10%')
-            plt.axhline(y=5, color='purple', linestyle='--', linewidth=0.5, label='Threshold 5%')
+            #plt.axhline(y=25, color='gold', linestyle='--', linewidth=0.5, label='Thresholds 25, 50%')
+            #plt.axhline(y=50, color='gold', linestyle='--', linewidth=0.5)
+            #plt.axhline(y=10, color='black', linestyle='--', linewidth=0.5, label='Threshold 10%')
+            #plt.axhline(y=5, color='purple', linestyle='--', linewidth=0.5, label='Threshold 5%')
+
+            plt.axhline(y=50, color='red', linestyle='--', linewidth=0.8, label='50%')
+            plt.axhline(y=25, color='orange', linestyle='--', linewidth=0.8, label='25%')
+            plt.axhline(y=12.65, color='dodgerblue', linestyle='--', linewidth=0.8, label='Heuristic alg, 12.65%')
+            #plt.axhline(y=10, color='dodgerblue', linestyle='--', linewidth=0.8, label='10%')
+            #plt.axhline(y=3.5, color='blue', linestyle='--', linewidth=0.8, label='value %')
+            plt.axhline(y=5,  color='limegreen', linestyle='--', linewidth=0.8, label='5%')
 
 
         plt.xlabel("Iterations")

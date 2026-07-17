@@ -30,15 +30,15 @@ try:
     
     if len(existing_columns) < len(columns_to_extract):
         missing = set(columns_to_extract) - set(existing_columns)
-        print(f"Attenzione, Alcune colonne non sono state trovate: {missing}")
+        print(f"Attention, some columns were not found: {missing}")
 
     # Crea il nuovo dataframe e salva
     df_extracted = df[existing_columns]
     df_extracted.to_csv(output_file, index=False)
     
-    print(f"Il file '{output_file}' è stato creato con {len(existing_columns)} colonne.")
+    print(f"The file'{output_file}' was created with {len(existing_columns)} columns.")
 
 except FileNotFoundError:
-    print(f"Errore: Il file '{input_file}' non è stato trovato.")
+    print(f"Error: file '{input_file}' not found.")
 except Exception as e:
-    print(f"Si è verificato un errore nella conversione: {e}")
+    print(f"An error occurred during the conversion: {e}")
