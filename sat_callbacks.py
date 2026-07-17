@@ -1,8 +1,9 @@
-from RL4CC.callbacks import BaseCallbacks
+from RL4CC.callbacks.base_callbacks import BaseCallbacks
 
 class SatCallbacks(BaseCallbacks):
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
+#    self.epsilon_reset_done = False # Flag del reset di epsilon
     self.RELEVANT_KEYS = [
       "current_time",
       "step_reward",

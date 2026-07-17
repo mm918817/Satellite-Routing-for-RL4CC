@@ -4,15 +4,24 @@
 
 This repository provides a custom Reinforcement Learning environment ([RL4CC](https://github.com/FFede0/RL4CC/tree/main)) optimized for satellite network routing, alongside telemetry and validation utilities.
 
-To execute this implementation, the RL4CC repository must be coupled with the custom environment configuration files. The main content of the repository is organized as follows:
+To execute this implementation, the RL4CC repository must be coupled with the custom environment configuration files.
+Specifically, follow these steps to set up the file structure correctly before building the Docker container:
+### 1. Download the RL4CC Repository
+Download or clone the target repository from its source and place it directly in the root of this project.
+
+### 2. Insert the Custom Callbacks File
+Move or copy the custom callbacks file, `sat_callbacks.py`,  provided in this repository into the deep nested directory inside the downloaded folder.
+
+
+ The main content of the repository is organized as follows:
 
 
 ``` bash
 /repo folder
-├── RL4CC-main/
+├── RL4CC-main/     # <-- [Downloaded Repo Root]
 │   └── RL4CC
 │       └── callbacks
-│           └── sat_callbacks.py # custom callbacks file
+│           └── sat_callbacks.py # Custom callbacks file [must be placed here]
 ├── plot_utils/                  # With utilities    
 ├── results/                     # Where the execution results are saved
 ├── main.py                      # Primary execution entry point for the container
