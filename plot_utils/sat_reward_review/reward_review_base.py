@@ -8,7 +8,7 @@ class RewardValidator:
     def __init__(self, topo_file, eval_file, dijkstra_file, w_step=1.0, w_dest=1.0):
         self.w_step = w_step
         self.w_dest = w_dest
-        self.MAX_HOPS = 9 # Da dijkstra_hop_number.py ci sono al max 9 hop
+        self.MAX_HOPS = 9 # Da dijkstra_hop_number.pyci ci sono al max 9 hop
 
         # Caricamento dati
         with open(topo_file, "r") as f:
@@ -27,7 +27,7 @@ class RewardValidator:
             self.topo[t] = {    # Assegna ogni topologia al suo "time"
                 s["id"]: s 
                 for s in t_entry["satellites"] # Quindi associa al "time" i satelliti per quella topologia
-            }
+                }
 
         # Lookup table: self.dijkstra_lookup [(time, start_id, end_id)] -> (dati flusso)
         # La chiave è una tupla
@@ -41,12 +41,11 @@ class RewardValidator:
 
     def run_validation(self, output_path="reward_report"):
         all_rewards = []
-        all_distances = []
         report_data = [] # Lista dati per CSV/json
 
-        print(f"{'='*66}")
-        print(f"{'REWARD VALIDATION':^60}")
-        print(f"{'='*66}\n")
+        print(f"{'='*60}")
+        print(f"{'VALIDAZIONE REWARD':^60}")
+        print(f"{'='*60}\n")
 
         for flow in self.eval_flows:
             flow_uuid = flow.get("id", "N/A")
@@ -57,7 +56,7 @@ class RewardValidator:
             # Recupera il path dijkstra pre-calcolato
             d_entry = self.dijkstra_lookup.get((t, s_id, e_id))
             if not d_entry:
-                print(f" Dijkstra path not found for the {flow_uuid} flow ({s_id}->{e_id}) at time {t}")
+                print(f"Path non trovato per Flow {flow_uuid} ({s_id}->{e_id}) al tempo {t}")
                 continue
 
             path = d_entry["path"]
@@ -72,8 +71,8 @@ class RewardValidator:
             end_sat = current_topo[e_id]
             jumps_rewards_list = []
 
-            print(f"=> Flow {flow_uuid} | Route: {s_id} -> {e_id} | Time: {t}")
-            print(f"{'-'*66}")
+            print(f"=> Analisi Flow {flow_uuid} | Route: {s_id} -> {e_id} | Time: {t}")
+            print(f"{'-'*60}")
 
             # Simula inoltro(salto) da un sat ad un altro del path Dijkstra
             # eg. 4 sat [100,105,109,112], fa 3 inoltri
@@ -94,10 +93,10 @@ class RewardValidator:
                 # --- LOGICA REWARD ---
                 if curr_id == e_id:
                     # Reward Destinazione
-                    reward = (d_dist / dist_tot) * self.w_dest # Reward destinazione dinamico (dovrebbe essere in base alla distanza di dijkstra)
-                    # reward = 1 # Reward fisso ad 1
+                    reward = (d_dist / dist_tot) * self.w_dest # Reward destinazione dinamico
+                    reward = 1 # Reward fisso ad 1
                     #print(f"Reward dest: {reward}") # Debug
-                    label = "FINAL(Dest)"
+                    label = "FINALE(Dest)"
                 else:
                     # Reward Step
                     neighbors_dict = s_prev["neighbors"]
@@ -118,12 +117,9 @@ class RewardValidator:
                     # Logica basata sugli step di dijkstra (1/30)
                     if step_counter <= d_hop:
                         reward = (1/30) * step_dyn_reward * self.w_step
-                        reward = reward + 0.05 # Bonus se agente si comporta come dijsktra (imitation learning leggero)
                     else:
                         reward = -((1/30) * step_dyn_reward * self.w_step)
-                    #reward = 1 # Reward fisso ad 1 (imitation learning forte)
                     label = f"STEP {step_counter}"
-
                     #print(f"Reward step: {reward}") # Debug
                 
                 total_reward += reward
@@ -153,10 +149,10 @@ class RewardValidator:
 
             report_data.append(row)
             all_rewards.append(total_reward)
-            all_distances.append(dist_tot)
+            
             # Stampa riassuntiva flusso
-            print(f"{'-'*66}")
-            print(f"  Result: Tot Distance: {dist_tot:.2f} km | Tot Reward: {total_reward:.5f}\n")
+            print(f"{'-'*60}")
+            print(f"  RISULTATO: Distanza Tot: {dist_tot:.2f} km | Reward Tot: {total_reward:.5f}\n")
 
         # --- EXPORT CSV ---
         keys = report_data[0].keys()
@@ -169,9 +165,9 @@ class RewardValidator:
         with open(f"{output_path}.json", "w") as f:
             json.dump(report_data, f, indent=4)
 
-        print("-" * 60)
-        print(f"Tot Distance mean: {np.mean(all_distances):.4f} km and Tot Reward mean: {np.mean(all_rewards):.4f}") #Media fatta sui reward totali tra i flussi
-        print(f"Report saved: {output_path}.csv and {output_path}.json")
+        print("-" * 45)
+        print(f"Media Reward Tot: {np.mean(all_rewards):.4f}") #Media fatta sui reward totali tra i flussi
+        print(f"Report salvati: {output_path}.csv e {output_path}.json")
 
 # --- ESECUZIONE ---
 validator = RewardValidator(
@@ -183,4 +179,3 @@ validator = RewardValidator(
 )
 validator.run_validation(output_path="report_reward_jumps")
 time.sleep(5)
-input()

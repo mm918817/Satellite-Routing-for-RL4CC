@@ -82,7 +82,6 @@ class RewardValidator:
             total_reward = 0.0
             dist_tot = 0.0
             step_counter = 0
-
             current_topo = self.topo[t] # Mappa satelliti per questo specifico tempo
             end_sat = current_topo[e_id]
             jumps_rewards_list = []
@@ -148,8 +147,8 @@ class RewardValidator:
                 # --- LOGICA REWARD ---
                 if curr_id == e_id:
                     # Reward Destinazione
-                    #reward = (d_dist / dist_tot) * self.w_dest # Reward destinazione dinamico (dovrebbe essere in base alla distanza di dijkstra)
-                    reward = 1.0 # Reward fisso ad 1
+                    reward = (d_dist / dist_tot) * self.w_dest # Reward destinazione dinamico (dovrebbe essere in base alla distanza di dijkstra)
+                    #reward = 1.0 # Reward fisso ad 1
                     #print(f"Reward dest: {reward}") # Debug
                     label = "FINAL(Dest)"
                 else:
@@ -177,6 +176,8 @@ class RewardValidator:
 
                     # --- Logica imitation learning ---
                     is_expert_choice = (len(optimal_path) > 1 and curr_id == optimal_path[1])
+
+                    #is_expert_choice = False # Per annullare effetto bonus imitation learning leggero, mette tutti gli step come (DEV)
 
                     if is_expert_choice:
                         reward = base_reward + 0.05 # Bonus se agente si comporta come dijsktra (imitation learning leggero)
@@ -207,7 +208,7 @@ class RewardValidator:
                 "flow_uuid": flow_uuid,  # ID flusso
                 "route": route_str,       
                 "time": t,
-                "hops": d_hop,
+                "hops": step_counter,
                 "total_distance": round(dist_tot, 2),
                 "total_reward": round(total_reward, 5)
             }
@@ -252,3 +253,4 @@ validator = RewardValidator(
 )
 validator.run_validation(output_path="report_reward_jumps")
 time.sleep(5)
+input()
